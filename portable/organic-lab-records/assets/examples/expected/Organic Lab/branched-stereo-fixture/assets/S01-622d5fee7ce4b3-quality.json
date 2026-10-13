@@ -1,0 +1,59 @@
+{
+  "chemistry": {
+    "graphRoundtrip": "passed",
+    "sourceImageFidelity": "not-machine-verified",
+    "stereoRoundtrip": "passed",
+    "cdxmlLayout": {
+      "canvasFit": "passed",
+      "drawingBounds": [
+        24,
+        24,
+        514.99998,
+        90.42118
+      ],
+      "pageBounds": [
+        0,
+        0,
+        540,
+        720
+      ],
+      "widthPages": 1,
+      "heightPages": 1,
+      "coordinateScale": 0.5997014343738556,
+      "captionInterpretation": "disabled"
+    },
+    "reactionImage": {
+      "kind": "single-reaction",
+      "width": 1000,
+      "height": 250,
+      "paddingPx": 20,
+      "inkBounds": [
+        20,
+        20,
+        980,
+        230
+      ]
+    }
+  },
+  "issues": [
+    {
+      "code": "reported_source_conflict",
+      "field": "conflicts",
+      "severity": "review",
+      "message": "本记录为合成测试材料，不能用于真实实验。"
+    },
+    {
+      "code": "image_fidelity_review",
+      "field": "structures",
+      "severity": "review",
+      "message": "人工核对结构、立体化学、图文对应和原图条件"
+    }
+  ],
+  "properties": {
+    "reviews": [
+      "A two-center starting material：常温形态待补。",
+      "B shared crude intermediate：常温形态待补。"
+    ]
+  },
+  "step": 1
+}

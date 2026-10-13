@@ -3,11 +3,12 @@ import { Chemistry } from "./chemistry";
 import { Citation, ExperimentStep, FileStore, finitePositive, RoutePlan, SourceAsset, StepArtifacts, validatePlan } from "./domain";
 import { buildBase, buildStepNote, GalleryOptions, pad, routeNote, stepFile } from "./records";
 import { checkEvidence, requiresStructureEdit } from "./quality";
-import { searchSources, sourcePage } from "./sources";
+import { searchSources, sourcePage, sourcePages } from "./sources";
 import { validateToolCall } from "./tools";
 import { PropertyResolver } from "./reagent-properties";
 import { BudgetLimits, DEFAULT_BUDGET, validateBudget } from "./budget";
 import { auditDelivery, assertDelivery, requireStructures } from "./delivery";
+import { SourceInventory, RegisteredCompound, StepBinding, validateInventory, verifyCompounds, expectedStep, inventoryIssues } from "./inventory";
 export type ProtocolItem = Record<string, unknown>;
 export interface Turn { output: ProtocolItem[]; usage?: unknown }
 export interface Transport { turn(input: ProtocolItem[]): Promise<Turn> }
@@ -23,6 +24,7 @@ export interface SessionState {
   provider?: { baseUrl: string; model: string; keyFingerprint: string };
   gallery?: GalleryOptions;
   executions?: Record<string, ToolExecution>;
+  inventory?: SourceInventory; compounds?: Record<string, RegisteredCompound>; bindings?: Record<number, StepBinding>;
 }
 const canonicalJson = (value: unknown): unknown => Array.isArray(value) ? value.map(canonicalJson) : value && typeof value === "object" ? Object.fromEntries(Object.entries(value).sort(([a], [b]) => a.localeCompare(b)).map(([key, item]) => [key, canonicalJson(item)])) : value;
 const stableQuality = (value: unknown): unknown => {
@@ -33,6 +35,7 @@ const stableQuality = (value: unknown): unknown => {
   return value;
 };
 const digest = (value: unknown) => createHash("sha256").update(JSON.stringify(canonicalJson(value))).digest("hex").slice(0, 14);
+export const withoutImages = (value: unknown): unknown => Array.isArray(value) ? value.map(withoutImages) : value && typeof value === "object" ? Object.fromEntries(Object.entries(value).filter(([key, item]) => !["png", "data"].includes(key) && !(key === "image" && typeof item === "string" && item.startsWith("iVBORw0KGgo"))).map(([key, item]) => [key, withoutImages(item)])) : value;
 export class AgentRunner {
   stopped = false;
   private running = false;
@@ -49,7 +52,7 @@ export class AgentRunner {
   }
   async save(): Promise<void> {
     await this.store.write(`${this.state.dir}/会话状态.json`, JSON.stringify(this.state, null, 2), true);
-    await this.store.write(`${this.state.dir}/运行日志.json`, JSON.stringify({ harness: "organic-lab/0.1.2", events: this.state.events }, null, 2), true);
+    await this.store.write(`${this.state.dir}/运行日志.json`, JSON.stringify({ harness: "organic-lab/0.2.0", events: this.state.events }, null, 2), true);
   }
   async event(kind: string, details: ProtocolItem = {}): Promise<void> {
     this.state.events.push({ time: new Date().toISOString(), kind, ...details });
@@ -80,7 +83,77 @@ export class AgentRunner {
     if (JSON.stringify(canonicalJson(stableQuality(existing))) !== JSON.stringify(canonicalJson(stableQuality(report)))) throw new Error(`artifact_conflict: 已有质量报告内容不同，保留原文件 ${path}`);
   }
   async execute(name: string, args: Record<string, unknown>): Promise<ProtocolItem> {
+    if (name === "record_inventory") {
+      const inventory = args.inventory as SourceInventory;
+      validateInventory(inventory, this.state.sources);
+      if (this.state.inventory && digest(this.state.inventory) !== digest(inventory)) throw new Error("inventory_conflict: 保留原始观察；来源事实修正需新路线，不能删约束掩盖失败");
+      await this.writeArtifact(`${this.state.dir}/来源清单.json`, JSON.stringify(inventory, null, 2));
+      this.state.inventory = inventory; this.state.compounds ??= {}; this.state.bindings ??= {};
+      return { experiments: inventory.experiments.length, compounds: inventory.compounds.length, targets: inventory.targets, next: "register_compounds" };
+    }
+    if (name === "register_compounds") {
+      const compounds = await verifyCompounds(this.state, this.chemistry, args.structures as { compoundId: string; smiles: string }[]);
+      this.state.compounds = Object.fromEntries(compounds.map(c => [c.id, c]));
+      return { compounds, next: "bind_steps" };
+    }
+    if (name === "bind_steps") {
+      if (!this.state.inventory) throw new Error("inventory_missing");
+      const bindings = args.bindings as StepBinding[];
+      if (!bindings.length || bindings.length > 60 || new Set(bindings.map(b => b.step)).size !== bindings.length) throw new Error("binding_batch_invalid");
+      const prepared: { step: ExperimentStep; binding: StepBinding }[] = [];
+      for (const requested of bindings) {
+        const current = this.step(requested.step), step = structuredClone(current), binding = structuredClone(requested);
+        const experiment = this.state.inventory.experiments.find(e => e.id === binding.experimentId);
+        if (!experiment || step.paperStep !== experiment.paperStep) throw new Error("paper_step_mismatch: 计划与来源实验编号必须一致");
+        const get = (id: string) => { const value = this.state.compounds?.[id]; if (!value) throw new Error(`compound_unregistered: ${id}`); return value; };
+        const reactants = experiment.reactants.map(id => get(id).smiles), products = experiment.products.map(id => get(id).smiles);
+        if (this.state.written[step.order]) {
+          await this.chemistry.call({ op: "check_binding", ...step, expectedReactants: reactants, expectedProducts: products, edits: step.edits ?? [] });
+        } else {
+          step.reactants = reactants; step.products = products;
+          if ([...experiment.reactants, ...experiment.products].some(id => this.state.inventory!.compounds.find(c => c.id === id)?.stereo.scope === "relative") && !step.belowArrow.some(text => /relative|相对构型/i.test(text))) step.belowArrow.push("relative configuration; absolute configuration not assigned");
+        }
+        for (const [role, ids] of [["substrate", experiment.reactants], ["product", experiment.products]] as const) {
+          let rows = step.reagents.filter(r => r.role === role);
+          if (!rows.length && !this.state.written[step.order]) {
+            rows = ids.map(id => {
+              const observation = this.state.inventory!.compounds.find(c => c.id === id)!;
+              const row = { id: `${role}-${id}`, name: observation.label, role, smiles: get(id).smiles, mw: get(id).mw, formula: get(id).formula,
+                equivalents: null, referenceAmountMmol: null, referenceMassMg: null, referenceVolumeMl: null, concentrationM: null,
+                densityGml: null, purityPercent: null, physicalState: null, citations: observation.citations, propertySources: [] };
+              step.reagents.push(row); binding.reagents.push({ reagentId: row.id, compoundId: id }); return row;
+            });
+          }
+          if (rows.length === 1 && ids.length === 1 && !binding.reagents.some(link => link.reagentId === rows[0].id)) binding.reagents.push({ reagentId: rows[0].id, compoundId: ids[0] });
+          for (const row of rows) {
+            const links = binding.reagents.filter(link => link.reagentId === row.id);
+            if (links.length !== 1 || !ids.includes(links[0].compoundId)) throw new Error(`reagent_binding_missing: ${row.id}`);
+            if (!this.state.written[step.order]) {
+              const compound = get(links[0].compoundId);
+              if (row.smiles && row.smiles !== compound.smiles) {
+                row.physicalState = null; row.densityGml = null; row.concentrationM = null; row.purityPercent = null;
+                row.propertySources = (row.propertySources ?? []).filter(p => !["physicalState", "densityGml", "concentrationM", "purityPercent"].includes(p.property));
+                row.userProperties = (row.userProperties ?? []).filter(p => !["physicalState", "densityGml", "concentrationM", "purityPercent"].includes(p));
+              }
+              row.smiles = compound.smiles; row.mw = compound.mw; row.formula = compound.formula;
+              row.propertySources = (row.propertySources ?? []).filter(p => p.property !== "mw" && p.property !== "formula");
+              for (const property of ["mw", "formula"] as const) row.propertySources.push({ property, kind: "structure", reference: `来源化合物登记 ${compound.id}；RDKit平均摩尔质量和实际分子式`, citation: null, url: null, temperatureC: null });
+            }
+          }
+        }
+        if (new Set(binding.reagents.map(link => link.reagentId)).size !== binding.reagents.length || binding.reagents.some(link => !step.reagents.some(row => row.id === link.reagentId) || !this.state.compounds?.[link.compoundId])) throw new Error("reagent_binding_invalid");
+        prepared.push({ step, binding });
+      }
+      for (const item of prepared) {
+        Object.assign(this.step(item.step.order), item.step);
+        (this.state.bindings ??= {})[item.step.order] = item.binding;
+        if (!this.state.written[item.step.order]) delete this.state.rendered[item.step.order];
+      }
+      return { steps: prepared.map(item => item.step.order), next: "materialize_steps" };
+    }
+    if (name === "inspect_structures") return this.chemistry.call({ op: "inspect_structures", smiles: args.smiles });
     if (name === "search_sources") return { hits: searchSources(this.state.sources, String(args.query), Number(args.limit)) };
+    if (name === "read_source_pages") return sourcePages(this.store, this.chemistry, this.state.sources, args.pages as { sourceId: string; page: number; bbox: number[] | null }[]);
     if (name === "read_source_page") {
       const source = this.source(String(args.sourceId));
       const page = await sourcePage(this.store, this.chemistry, source, Number(args.page), args.bbox as number[] | null);
@@ -90,7 +163,7 @@ export class AgentRunner {
       if (Object.keys(this.state.written).length) throw new Error("records_exist: 实验记录已保存，修改请建立新路线或由用户编辑");
       const plan = args.plan as unknown as RoutePlan;
       validatePlan(plan);
-      this.state.plan = plan; this.state.rendered = {};
+      this.state.plan = plan; this.state.rendered = {}; this.state.bindings = {};
       return { stepCount: plan.steps.length, steps: plan.steps.map(s => ({ order: s.order, title: s.title, review: checkEvidence(s, this.state.sources) })) };
     }
     if (name === "inspect_structure") return this.chemistry.call({ op: "inspect", smiles: args.smiles });
@@ -110,6 +183,19 @@ export class AgentRunner {
       step.reactants = reactants; step.products = products;
       delete this.state.rendered[step.order];
       return { step: step.order, structures: inspected, next: "render_step" };
+    }
+    if (name === "validate_plan") {
+      const steps = this.state.plan?.steps ?? [], issues = inventoryIssues(this.state, steps, this.state.sources);
+      if (!steps.length) issues.push({ step: 0, code: "plan_missing", message: "先record_route" });
+      if (this.state.inventory && Object.keys(this.state.compounds ?? {}).length) {
+        try { await verifyCompounds(this.state, this.chemistry); }
+        catch (error) { issues.push({ step: 0, code: "compound_validation_failed", message: String(error) }); }
+      }
+      for (const step of steps) if (this.state.bindings?.[step.order]) {
+        try { await this.chemistry.call({ op: "check_binding", ...step, ...expectedStep(this.state, step) }); }
+        catch (error) { issues.push({ step: step.order, code: "binding_validation_failed", message: String(error) }); }
+      }
+      return { ready: steps.length > 0 && !issues.length, issues, next: issues.length ? "repair_plan" : "materialize_steps", artifactAcceptance: false };
     }
     if (name === "validate_route") {
       const report = await auditDelivery(this.state, this.store, this.chemistry);
@@ -167,8 +253,8 @@ export class AgentRunner {
         return { artifacts: this.state.rendered[step.order], reused: true };
       }
       const propertyResult = await this.properties.prefill(step.reagents, this.state.sources, true);
-      const key = digest({ renderer: "0.1.2", step }); const prefix = `${this.state.dir}/assets/S${pad(step.order)}-${key}`;
-      const result = await this.chemistry.call<{ png: string; cdxml: string; properties: { smiles: string; mw: number }[]; quality: unknown }>({ op: "render_step", ...step });
+      const key = digest({ renderer: "0.2.0", step }); const prefix = `${this.state.dir}/assets/S${pad(step.order)}-${key}`;
+      const result = await this.chemistry.call<{ png: string; cdxml: string; properties: { smiles: string; mw: number }[]; quality: unknown }>({ op: "render_step", ...step, ...expectedStep(this.state, step) });
       const quality = checkEvidence(step, this.state.sources);
       await this.writeBinaryArtifact(`${prefix}.png`, Buffer.from(result.png, "base64"));
       await this.writeArtifact(`${prefix}.cdxml`, result.cdxml);
@@ -211,14 +297,42 @@ export class AgentRunner {
       this.state.status = "completed";
       return { route: `${this.state.dir}/路线.md`, gallery: `${this.state.dir}/路线.base`, stepFiles: this.state.written, status: "drafts_created", delivery };
     }
+    if (name === "materialize_steps") {
+      const orders = args.steps as number[];
+      if (!orders.length || orders.length > 8 || new Set(orders).size !== orders.length) throw new Error("materialize_batch_invalid: 选择1至8个不同步骤");
+      for (const order of orders) {
+        this.step(order);
+        if (!this.state.bindings?.[order]) throw new Error(`step_unbound: ${order}，先登记并绑定结构`);
+      }
+      const results: ProtocolItem[] = new Array(orders.length);
+      let index = 0;
+      const worker = async () => {
+        while (index < orders.length) {
+          const slot = index++, step = orders[slot];
+          try {
+            await this.execute("render_step", { step });
+            results[slot] = { step, status: "saved", ...await this.execute("write_step", { step }) };
+            results[slot].status = "saved";
+          } catch (error) { results[slot] = { step, status: "error", message: error instanceof Error ? error.message : String(error) }; }
+        }
+      };
+      await Promise.all(Array.from({ length: Math.min(2, orders.length) }, worker));
+      return { status: results.every(result => result.status === "saved") ? "saved" : "partial", results, concurrency: Math.min(2, orders.length) };
+    }
     throw new Error(`unknown_tool: ${name}`);
   }
   async validateCachedDelivery(name: string, args: Record<string, unknown>): Promise<void> {
-    if (!["render_step", "write_step", "finish_route"].includes(name)) return;
-    const steps = name === "finish_route" ? this.state.plan?.steps : [this.step(Number(args.step))];
+    if (!["render_step", "write_step", "finish_route", "materialize_steps"].includes(name)) return;
+    const steps = name === "finish_route" ? this.state.plan?.steps : name === "materialize_steps" ? (args.steps as number[]).map(order => this.step(order)) : [this.step(Number(args.step))];
     const report = await auditDelivery(this.state, this.store, this.chemistry, steps, name !== "render_step");
     if (!report.complete && this.state.status === "completed") this.state.status = "deliveryIncomplete";
     assertDelivery(report);
+    if (name === "finish_route") for (const file of ["路线.md", "路线.base"]) {
+      if (!await this.store.exists(`${this.state.dir}/${file}`)) {
+        if (this.state.status === "completed") this.state.status = "deliveryIncomplete";
+        throw new Error(`route_assets_missing: ${file}，重新finish_route修复`);
+      }
+    }
     if (name === "finish_route" && this.state.plan && requiresStructureEdit(this.state.plan.requestedChanges) && !this.state.plan.steps.some(s => s.edits?.length)) {
       throw new Error("requested_edit_not_executed: 没有本地结构编辑回执");
     }
@@ -235,9 +349,16 @@ export class AgentRunner {
     return calls.filter(item => !answered.has(item.call_id));
   }
   private toolOutput(callId: string, result: ProtocolItem): ProtocolItem {
-    const output = typeof result.image === "string" ? [
-      { type: "input_text", text: JSON.stringify(Object.fromEntries(Object.entries(result).filter(([key]) => key !== "image"))) },
+    if (typeof result.image === "string" && result.mime === "image/png") return { type: "function_call_output", call_id: callId, output: [
+      { type: "input_text", text: JSON.stringify(withoutImages(result)) },
       { type: "input_image", image_url: `data:${result.mime || "image/png"};base64,${result.image}` }
+    ] };
+    const pages = Array.isArray(result.pages) ? result.pages.filter((p): p is ProtocolItem => !!p && typeof p === "object" && typeof p.image === "string") : [];
+    const images = pages;
+    const output = images.length ? [
+      { type: "input_text", text: JSON.stringify(withoutImages(result)) },
+      ...images.flatMap(page => [{ type: "input_text", text: JSON.stringify({ sourceId: page.sourceId, page: page.page }) },
+        { type: "input_image", image_url: `data:${page.mime || "image/png"};base64,${page.image}` }])
     ] : JSON.stringify(result);
     return { type: "function_call_output", call_id: callId, output };
   }
@@ -245,7 +366,7 @@ export class AgentRunner {
     const event = [...this.state.events].reverse().find(item => item.callId === call.call_id && item.tool === call.name && ["tool_completed", "tool_failed"].includes(String(item.kind)));
     if (!event) return null;
     if (event.kind === "tool_failed") return this.toolOutput(String(call.call_id), { status: "error", message: event.message });
-    if (call.name === "read_source_page") {
+    if (["read_source_page", "read_source_pages"].includes(String(call.name))) {
       const args: unknown = JSON.parse(String(call.arguments)); validateToolCall(String(call.name), args);
       if (!args || typeof args !== "object" || Array.isArray(args)) throw new Error("tool_arguments_invalid: 参数需要对象");
       return this.toolOutput(String(call.call_id), await this.execute(String(call.name), Object.fromEntries(Object.entries(args))));
@@ -267,7 +388,7 @@ export class AgentRunner {
     const recovered = execution?.output ?? await this.legacyOutput(call);
     if (recovered) {
       let output = recovered;
-      if (["render_step", "write_step", "finish_route"].includes(name)) {
+      if (["render_step", "write_step", "finish_route", "materialize_steps"].includes(name)) {
         try { await this.validateCachedDelivery(name, JSON.parse(argumentsText)); }
         catch (error) { output = this.toolOutput(callId, { status: "error", message: error instanceof Error ? error.message : String(error) }); }
       }
@@ -312,7 +433,7 @@ export class AgentRunner {
     }
     if (waiting) { await this.event("question", { callId, question: this.state.question?.text }); return true; }
     this.completeCall(call, this.toolOutput(callId, result));
-    const details = failed ? { tool: name, callId, ...result } : { tool: name, callId, result: Object.fromEntries(Object.entries(result).filter(([key]) => key !== "image")) };
+    const details = failed ? { tool: name, callId, ...result } : { tool: name, callId, result: withoutImages(result) };
     await this.event(failed ? "tool_failed" : "tool_completed", details);
     return false;
   }

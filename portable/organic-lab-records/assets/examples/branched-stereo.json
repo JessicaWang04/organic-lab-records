@@ -1,0 +1,17 @@
+{
+  "id":"branched-stereo-fixture",
+  "title":"Synthetic stereo/one-pot branch — harness fixture only",
+  "synthetic":true,
+  "compounds":[
+    {"id":"A","label":"A two-center starting material","smiles":"C[C@H](O)[C@H](N)C(=O)O","origin":"starting","centers":2},
+    {"id":"B","label":"B shared crude intermediate","smiles":"C[C@H](O)[C@H](N)C(=O)OC","origin":"intermediate","centers":2},
+    {"id":"P0","label":"P0 target","smiles":"C[C@H](OC(C)=O)[C@H](NC(C)=O)C(=O)OC","origin":"target","centers":2},
+    {"id":"P1","label":"P1 epimer target","smiles":"C[C@@H](OC(C)=O)[C@H](NC(C)=O)C(=O)OC","origin":"target","centers":2,"isomerOf":"P0","relationship":"epimer"}
+  ],
+  "experiments":[
+    {"id":"E1","reactants":["A"],"products":["B"],"handling":"crude-transfer","stages":1},
+    {"id":"E2","reactants":["B"],"products":["P0"],"handling":"one-pot","stages":2},
+    {"id":"E3","reactants":["B"],"products":["P1"],"handling":"isolated","stages":1}
+  ],
+  "targets":["P0","P1"]
+}

@@ -8,6 +8,7 @@ import { indexSource } from "../src/sources";
 import { TOOLS, validateToolCall } from "../src/tools";
 import { LocalStore } from "./local-store";
 import { auditDelivery } from "../src/delivery";
+import { validateInventory } from "../src/inventory";
 
 function object(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("request_invalid: 需要 JSON 对象");
@@ -72,6 +73,8 @@ export class LocalToolkit {
     const state: unknown = JSON.parse(await store.read(`${dir}/会话状态.json`)); assertSession(state);
     if (state.id !== routeId || state.dir !== dir) throw new Error("session_location_conflict: 会话身份与输出目录不一致");
     if (state.plan) validatePlan(state.plan);
+    if (state.inventory) { validateToolCall("record_inventory", { inventory: state.inventory }); validateInventory(state.inventory, state.sources); }
+    if (state.bindings) validateToolCall("bind_steps", { bindings: Object.values(object(state.bindings)) });
     return state;
   }
   private runner(state: SessionState, store: LocalStore): AgentRunner {
@@ -153,10 +156,14 @@ export class LocalToolkit {
         const result: unknown = JSON.parse(previous.output.output);
         try { await runner.validateCachedDelivery(tool, args); }
         catch (error) { await runner.event("cached_delivery_rejected", { tool, callId }); throw error; }
-        if (tool === "validate_route") return { callId, tool, reused: false, result: await runner.execute(tool, args), status: state.status };
+        if (tool === "validate_route" || tool === "validate_plan") {
+          const refreshed = await runner.execute(tool, args);
+          await runner.event("validation_refreshed", { tool, callId, result: refreshed });
+          return { callId, tool, reused: false, result: refreshed, status: state.status };
+        }
         return { callId, tool, reused: true, result, status: state.status };
       }
-      if (state.status === "completed" && !["validate_route", "read_source_page", "search_sources", "inspect_structure", "locate_reaction", "finish_route", "render_step", "write_step"].includes(tool)) throw new Error("route_completed: 已完成的路线需要由用户修改记录或新建路线");
+      if (state.status === "completed" && !["validate_plan", "validate_route", "read_source_page", "read_source_pages", "search_sources", "inspect_structure", "inspect_structures", "locate_reaction", "finish_route", "render_step", "write_step", "materialize_steps"].includes(tool)) throw new Error("route_completed: 已完成的路线需要由用户修改记录或新建路线");
       state.executions ??= {};
       if (!previous) state.calls++;
       state.executions[callId] = { name: tool, arguments: argumentsText, phase: "started" };
@@ -172,6 +179,20 @@ export class LocalToolkit {
           if (!Buffer.from(await store.readBinary(path)).equals(bytes)) throw new Error("source_image_conflict: 已保存的来源页面图不同，保留原文件");
         } else await store.binary(path, bytes);
         result = { ...Object.fromEntries(Object.entries(result).filter(([key]) => key !== "image")), imageFile: join(vault, path) };
+      }
+      if (tool === "read_source_pages" && Array.isArray(result.pages)) {
+        const pages: ProtocolItem[] = [];
+        for (let index = 0; index < result.pages.length; index++) {
+          const page = object(result.pages[index]);
+          if (typeof page.image !== "string") throw new Error("page_batch_result_invalid");
+          const path = `${dir}/assets/read-page-${createHash("sha256").update(JSON.stringify(canonical((args.pages as unknown[])[index]))).digest("hex").slice(0, 14)}.png`;
+          const bytes = Buffer.from(page.image, "base64");
+          if (await store.exists(path)) {
+            if (!Buffer.from(await store.readBinary(path)).equals(bytes)) throw new Error("source_image_conflict: 保留已有来源图");
+          } else await store.binary(path, bytes);
+          pages.push({ ...Object.fromEntries(Object.entries(page).filter(([key]) => key !== "image")), imageFile: join(vault, path) });
+        }
+        result = { ...result, pages };
       }
       state.executions[callId] = { name: tool, arguments: argumentsText, phase: "completed", output: { type: "function_call_output", call_id: callId, output: JSON.stringify(result) } };
       await runner.event("local_tool_completed", { tool, callId, result });

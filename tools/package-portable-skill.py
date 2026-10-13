@@ -52,6 +52,8 @@ def main() -> None:
     output = (args.output or project / "dist").resolve()
     output.mkdir(parents=True, exist_ok=True)
     required = ("SKILL.md", "setup.ps1", "setup-codex.cmd", "setup-opencode.cmd",
+                "manifest.yaml", "core/workflow.md", "core/chemistry.md", "references/recovery.md",
+                "scripts/replay_examples.py", "assets/examples/linear.json", "assets/examples/branched-stereo.json",
                 "scripts/organic-lab.cjs", "scripts/chemistry_worker.py", "references/tools.json",
                 "scripts/runtime/node.exe", "scripts/runtime/NODE-LICENSE.txt", "bundle.json",
                 "assets/opencode-command/lab.md",
@@ -91,7 +93,7 @@ def main() -> None:
     (output / "使用说明.md").write_bytes(instructions.read_bytes())
     manifest = {"version": json.loads((skill / "bundle.json").read_text(encoding="utf-8"))["version"],
                 "archives": reports, "machineConfigurationIncluded": False,
-                "userRecordsIncluded": False, "workbuddyClientImportTested": False}
+                "userRecordsIncluded": False, "syntheticExamplesIncluded": True, "workbuddyClientImportTested": False}
     (output / "distribution.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(manifest, ensure_ascii=False, indent=2))
 

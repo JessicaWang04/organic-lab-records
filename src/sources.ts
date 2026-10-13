@@ -21,3 +21,14 @@ export async function sourcePage(store: FileStore, chemistry: Chemistry, asset: 
   if (asset.mime !== "application/pdf") return chemistry.call({ op: "image_crop", data, bbox });
   return chemistry.call({ op: "pdf_page", data, page, bbox });
 }
+export async function sourcePages(store: FileStore, chemistry: Chemistry, sources: SourceAsset[], requests: { sourceId: string; page: number; bbox: number[] | null }[]): Promise<{ pages: { sourceId: string; page: number; text: string; image: string; mime: string }[] }> {
+  if (!requests.length || requests.length > 8) throw new Error("page_batch_invalid: 一批1至8页");
+  const assets = await Promise.all([...new Set(requests.map(r => r.sourceId))].map(async id => {
+    const asset = sources.find(s => s.id === id);
+    if (!asset) throw new Error(`source_not_found: ${id}`);
+    return { id, mime: asset.mime, data: Buffer.from(await store.readBinary(asset.path)).toString("base64") };
+  }));
+  const result = await chemistry.call<{ pages: { sourceId: string; page: number; text: string; image: string; mime: string }[] }>({ op: "source_pages", sources: assets, pages: requests });
+  if (!Array.isArray(result.pages) || result.pages.length !== requests.length || result.pages.some((page, index) => page.sourceId !== requests[index].sourceId || page.page !== requests[index].page || typeof page.text !== "string" || typeof page.image !== "string" || !page.image.length || page.mime !== "image/png")) throw new Error("page_batch_result_invalid: 缺少与请求顺序对应的真实页面");
+  return result;
+}

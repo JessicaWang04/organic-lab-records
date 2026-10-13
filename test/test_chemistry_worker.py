@@ -182,5 +182,90 @@ class ChemistryTests(unittest.TestCase):
                 worker.heading_crop(pdf, 1, "Compound 19")
 
 
+class InventoryTests(unittest.TestCase):
+    def observation(self, cid, formula=None, centers=0, components=1, scope=None):
+        return {"id": cid, "formula": None if formula is None else {"formula": formula, "adduct": None, "mz": None},
+                "stereo": {"scope": scope or ("specified" if centers else "achiral"), "centers": centers, "doubleBonds": 0},
+                "components": components, "isomerOf": None, "relationship": None}
+
+    def test_formula_and_salt_components_are_actual_graph_constraints(self):
+        observation = self.observation("salt", "C2H8ClN", components=2)
+        valid = {"observations": [observation], "structures": [{"id": "salt", "smiles": "CC[NH3+].[Cl-]"}]}
+        result = worker.verify_compounds(valid)["compounds"][0]
+        self.assertEqual(result["formula"], "C2H8ClN")
+        for smiles, error in (("CCN", "compound_component_mismatch"), ("C[NH3+].[Cl-]", "compound_formula_mismatch")):
+            with self.subTest(smiles=smiles), self.assertRaisesRegex(ValueError, error):
+                worker.verify_compounds({**valid, "structures": [{"id": "salt", "smiles": smiles}]})
+
+    def test_lost_or_invented_stereochemistry_is_rejected(self):
+        for observation, smiles in ((self.observation("a", centers=1), "CC(N)C(=O)O"), (self.observation("a", scope="unspecified"), "C[C@H](N)C(=O)O")):
+            with self.subTest(smiles=smiles), self.assertRaisesRegex(ValueError, "compound_stereo_mismatch"):
+                worker.verify_compounds({"observations": [observation], "structures": [{"id": "a", "smiles": smiles}]})
+        observation = self.observation("a", centers=1)
+        observation["stereo"]["centers"] = None
+        with self.assertRaisesRegex(ValueError, "stereo_observation_missing"):
+            worker.verify_compounds({"observations": [observation], "structures": [{"id": "a", "smiles": "C[C@H](N)C(=O)O"}]})
+
+    def test_epimer_and_enantiomer_relations_compare_mapped_centers(self):
+        a = "C[C@H](O)[C@H](N)C(=O)O"
+        epimer = "C[C@@H](O)[C@H](N)C(=O)O"
+        enantiomer = "C[C@@H](O)[C@@H](N)C(=O)O"
+        self.assertEqual(worker.isomer_relationship(a, epimer, "epimer")["invertedCenters"], 1)
+        self.assertEqual(worker.isomer_relationship(a, enantiomer, "enantiomer")["invertedCenters"], 2)
+        for b, relation in ((a, "epimer"), (enantiomer, "epimer"), (epimer, "enantiomer")):
+            with self.subTest(b=b), self.assertRaisesRegex(ValueError, "isomer_relationship_mismatch"):
+                worker.isomer_relationship(a, b, relation)
+        with self.assertRaisesRegex(ValueError, "isomer_graph_mismatch"):
+            worker.isomer_relationship(a, "C[C@@H](O)[C@H](N)C(=O)OC", "epimer")
+
+    def test_parent_required_and_distinct_epimer_can_be_registered_together(self):
+        observations = [self.observation("p", centers=2), self.observation("epi", centers=2)]
+        observations[1].update(isomerOf="p", relationship="epimer")
+        structures = [{"id": "p", "smiles": "C[C@H](O)[C@H](N)C(=O)O"}, {"id": "epi", "smiles": "C[C@@H](O)[C@H](N)C(=O)O"}]
+        self.assertEqual(len(worker.verify_compounds({"observations": observations, "structures": structures})["compounds"]), 2)
+        with self.assertRaisesRegex(ValueError, "isomer_parent_missing"):
+            worker.verify_compounds({"observations": observations[1:], "structures": structures[1:]})
+
+    def test_bound_table_formula_mw_and_scheme_cannot_drift(self):
+        request = {"reactants": ["OCC"], "products": ["CC=O"], "expectedReactants": ["CCO"], "expectedProducts": ["CC=O"],
+                   "reagentStructures": [{"id": "SM", "expected": "CCO", "actual": "OCC", "mw": 46.069, "formula": "C2H6O"}]}
+        worker.check_bound_structures(request)
+        for field, value, error in (("actual", "CCN", "reagent_structure_mismatch"), ("mw", 18, "reagent_mw_mismatch"), ("formula", "C3H8O", "reagent_formula_mismatch")):
+            changed = {**request, "reagentStructures": [{**request["reagentStructures"][0], field: value}]}
+            with self.subTest(field=field), self.assertRaisesRegex(ValueError, error):
+                worker.check_bound_structures(changed)
+        with self.assertRaisesRegex(ValueError, "bound_structure_mismatch"):
+            worker.check_bound_structures({**request, "products": ["CCO"]})
+
+    def test_salt_cdxml_roundtrip_preserves_both_components(self):
+        request = {"reactants": ["CC[NH3+].[Cl-]"], "products": ["CCN"], "aboveArrow": [], "belowArrow": []}
+        rendered = worker.render_step(request)
+        self.assertEqual(worker.verify_step_artifacts({**request, **rendered})["stereoRoundtrip"], "passed")
+
+    def test_batch_inspection_has_order_and_limits(self):
+        result = worker.execute({"op": "inspect_structures", "smiles": ["OCC", "CC=O", "C[C@H](N)C(=O)O"]})
+        self.assertEqual([c["formula"] for c in result["structures"]], ["C2H6O", "C2H4O", "C3H7NO2"])
+        self.assertEqual(len(result["structures"][2]["stereo"]["centers"]), 1)
+        for smiles in ([], ["C"] * 65, ["INVALID"]):
+            with self.subTest(count=len(smiles)), self.assertRaises(ValueError):
+                worker.execute({"op": "inspect_structures", "smiles": smiles})
+
+    def test_batch_pdf_crops_preserve_source_identity_and_real_pixels(self):
+        import pymupdf
+        with pymupdf.open() as pdf:
+            pdf.new_page().insert_text((50, 80), "Source page 1")
+            pdf.new_page().insert_text((50, 80), "Source page 2")
+            encoded = base64.b64encode(pdf.tobytes()).decode()
+        request = {"op": "source_pages", "sources": [{"id": "si", "mime": "application/pdf", "data": encoded}],
+                   "pages": [{"sourceId": "si", "page": 2, "bbox": [0, 0, .5, .5]}, {"sourceId": "si", "page": 1, "bbox": None}]}
+        result = worker.execute(request)["pages"]
+        self.assertEqual([p["page"] for p in result], [2, 1])
+        self.assertIn("Source page 2", result[0]["text"])
+        with worker.Image.open(io.BytesIO(base64.b64decode(result[0]["image"]))) as crop:
+            self.assertLess(crop.height, 1000)
+        with self.assertRaisesRegex(ValueError, "invalid_pdf_page"):
+            worker.execute({**request, "pages": [{"sourceId": "si", "page": 3, "bbox": None}]})
+
+
 if __name__ == "__main__":
     unittest.main()

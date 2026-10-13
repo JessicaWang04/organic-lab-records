@@ -1,0 +1,23 @@
+{
+  "scope": "four native structures; process startup and parsing only",
+  "notWholePaperBenchmark": true,
+  "python": "3.13.0",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "samples": 3,
+  "structures": 4,
+  "sequentialProcessesPerSample": 4,
+  "batchProcessesPerSample": 1,
+  "sequentialSeconds": [
+    2.195318999999472,
+    2.1763270999999804,
+    2.192931200000203
+  ],
+  "batchSeconds": [
+    0.5460152999994534,
+    0.5297922999998264,
+    0.5478498000002219
+  ],
+  "medianSpeedup": 4.0162449660337325,
+  "sequentialMedianSeconds": 2.192931200000203,
+  "batchMedianSeconds": 0.5460152999994534
+}

@@ -111,3 +111,14 @@ sh '/path/to/organic-lab-records/scripts/run-lab.sh' init --request '/path/to/in
 - 本包随附编译后的 Node CLI；Windows 完整包带 `scripts/runtime/node.exe`（Node 24），轻量包和其他平台需可用 Node 20 或更新版本。
 
 worker 不含 OCR 引擎或图像到 SMILES 的自动识别器。结构识别与文献理解由宿主模型完成，本地工具验证输入结构并明确保存核对状态。
+
+
+## 分层指南与筛选合同（0.2.0）
+
+`guide --request guide.json`：请求 `{"sourceFormat":"pdf-text","topics":["stereo","one-pot","recovery"]}`。sourceFormat/topics来自manifest.yaml；输出核心与选中层的真实内容/路径/hash，并发读取，不调用模型。核心始终保留。宿主自己组织JSON，普通用户仍只给新文献。
+
+`contracts --request names.json`：names.json为工具名数组，例如 `["record_inventory","register_compounds"]`。只返回选中schema，减少重复上下文。无参数contracts返回全部本地schema。
+
+新增工作流：record_inventory → register_compounds → record_route → bind_steps → validate_plan → materialize_steps → validate_route → finish_route。初次先读core/workflow。每次call仍带vault/routeId/tool/args/callId。read_source_pages一次≤8，inspect_structures≤64，materialize_steps≤8且内部最多2步并行；同一路线多个CLI写入仍受锁保护。
+
+完整离线重放：`python scripts/replay_examples.py --output <新的绝对目录>`，生成两个完整合成示例及正常/拒绝检查报告，不是实验方案或识别benchmark。

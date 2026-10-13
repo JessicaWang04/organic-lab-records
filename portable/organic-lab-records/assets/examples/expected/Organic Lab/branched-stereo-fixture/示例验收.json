@@ -1,0 +1,77 @@
+{
+  "case": "branched-stereo-fixture",
+  "synthetic": true,
+  "notAnOcrBenchmark": true,
+  "modelRequests": 0,
+  "delivery": {
+    "policy": "organic-lab-delivery/0.2.0",
+    "complete": true,
+    "requiredSteps": 3,
+    "verifiedReactionImages": 3,
+    "verifiedEditableCdxml": 3,
+    "verifiedRecords": 3,
+    "issues": []
+  },
+  "targets": [
+    "P0",
+    "P1"
+  ],
+  "expectedSteps": 3,
+  "expectedCompounds": 4,
+  "files": [
+    {
+      "path": "Organic Lab/branched-stereo-fixture/assets/S01-622d5fee7ce4b3.png",
+      "bytes": 18678,
+      "sha256": "255af76b40701072c95bb51d5499cb5fe7185e92408433215ac340bde0d1d064"
+    },
+    {
+      "path": "Organic Lab/branched-stereo-fixture/assets/S01-622d5fee7ce4b3.cdxml",
+      "bytes": 4032,
+      "sha256": "35d5cec94f595804735566d01dd9315a16d210787e297c871fe201b58414147f"
+    },
+    {
+      "path": "Organic Lab/branched-stereo-fixture/branched-stereo-fixture-01-R01-E1 synthetic fixture.md",
+      "bytes": 6253,
+      "sha256": "ec2be54bbf3c2f05f69bb7308e2a25ae2ba0c926779df63f56cb67248f3800fb"
+    },
+    {
+      "path": "Organic Lab/branched-stereo-fixture/assets/S02-1e7ad9abb051dd.png",
+      "bytes": 23678,
+      "sha256": "0d713c20e595a5a4cafbdda2f4cd36511ba279245c4cd81e9b3bfa5d72e46178"
+    },
+    {
+      "path": "Organic Lab/branched-stereo-fixture/assets/S02-1e7ad9abb051dd.cdxml",
+      "bytes": 4979,
+      "sha256": "5e0384b342d8716fc84a0db4812f8bf793b22c42a7ad924f6d3d5d3b308a320e"
+    },
+    {
+      "path": "Organic Lab/branched-stereo-fixture/branched-stereo-fixture-02-R01-E2 synthetic fixture.md",
+      "bytes": 6396,
+      "sha256": "51339243667d7937c0a29bc0f29965b512de69911a81de73c37c4045d0f73579"
+    },
+    {
+      "path": "Organic Lab/branched-stereo-fixture/assets/S03-37c636f8bb309d.png",
+      "bytes": 23857,
+      "sha256": "a0e354860cf7a2b7fac87f2bd3fdd2f2987560f74d2901dabda94337eb08c29d"
+    },
+    {
+      "path": "Organic Lab/branched-stereo-fixture/assets/S03-37c636f8bb309d.cdxml",
+      "bytes": 4975,
+      "sha256": "2c783cd84ea7ca10c29027aeeae896e90cb45973574d4ce531718c4878febfa7"
+    },
+    {
+      "path": "Organic Lab/branched-stereo-fixture/branched-stereo-fixture-03-R01-E3 synthetic fixture.md",
+      "bytes": 6284,
+      "sha256": "e234e20dc0ecd9446d472b373809624f94b4a6da3771017295da9a507e54d499"
+    }
+  ],
+  "negativeChecks": [
+    "compound_formula_mismatch",
+    "compound_stereo_mismatch",
+    "isomer_relationship_mismatch",
+    "missing_experiment",
+    "cached_finish_rejected_changed_png"
+  ],
+  "concurrency": 2,
+  "staticFormatting": "Final blank lines trimmed; native chemistry/files unchanged. Replay retains original generated notes."
+}

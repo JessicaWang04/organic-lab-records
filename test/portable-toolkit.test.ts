@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { fixtureDeliveryVerification } from "./delivery-fixture";
+import { fixtureDeliveryVerification, fixtureInventory } from "./delivery-fixture";
 import test from "node:test";
 import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -77,17 +77,34 @@ test("portable page reads return a real local image for host visual inspection",
   const reused = await f.toolkit.call({ ...f.request, tool: "read_source_page", args: { bbox: null, page: 1, sourceId: "image" }, callId: "read-1" });
   assert.equal(reused.reused, true);
 });
+test("portable batch page read saves ordered real images without base64 in the journal", async t => {
+  const f = await fixture(t);
+  const chemistry: Chemistry = { call: async <T>(request: Record<string, unknown>) => {
+    assert.equal(request.op, "source_pages");
+    return { pages: (request.pages as { sourceId: string; page: number }[]).map(page => ({ ...page, text: "fixture", image: png.toString("base64"), mime: "image/png" })) } as T;
+  } };
+  const response = await new LocalToolkit(chemistry).call({ ...f.request, tool: "read_source_pages", args: { pages: [{ sourceId: "image", page: 1, bbox: [.1, .1, .6, .6] }, { sourceId: "image", page: 1, bbox: null }] }, callId: "batch-read" });
+  const result = response.result as { pages: { imageFile: string; image?: string }[] };
+  assert.equal(result.pages.length, 2);
+  for (const page of result.pages) { assert.equal(page.image, undefined); assert.deepEqual(await readFile(page.imageFile), png); }
+  assert.notEqual(result.pages[0].imageFile, result.pages[1].imageFile);
+  assert.ok(!(await readFile(join(f.dir, "会话状态.json"), "utf8")).includes(png.toString("base64")));
+});
+
 test("portable toolkit creates the complete record set without any model API", async t => {
   const f = await fixture(t);
   const chemistry: Chemistry = { call: async <T>(request: Record<string, unknown>) => {
-    if (request.op === "verify_delivery") return fixtureDeliveryVerification(request) as T;
+    if (["verify_delivery", "verify_compounds", "check_binding"].includes(String(request.op))) return fixtureDeliveryVerification(request) as T;
     assert.equal(request.op, "render_step"); return { png: png.toString("base64"), cdxml: "fixture CDXML", quality: {}, properties: [] } as T;
   } };
   const toolkit = new LocalToolkit(chemistry);
+  await toolkit.call({ ...f.request, tool: "record_inventory", args: { inventory: fixtureInventory([step()], "image") }, callId: "inventory" });
+  await toolkit.call({ ...f.request, tool: "register_compounds", args: { structures: [{ compoundId: "c1", smiles: "CCO" }, { compoundId: "c2", smiles: "CC=O" }] }, callId: "compounds" });
   const calls = [{ tool: "record_route", args: { plan: { title: "fixture route", intent: "offline reusable tool validation", requestedChanges: [], steps: [step()] } } }, { tool: "render_step", args: { step: 1 } }, { tool: "write_step", args: { step: 1 } }, { tool: "finish_route", args: {} }];
   for (const [index, call] of calls.entries()) {
     const request = { ...f.request, ...call, callId: `tool-${index}` };
     const response = await toolkit.call(request);
+    if (call.tool === "record_route") await toolkit.call({ ...f.request, tool: "bind_steps", args: { bindings: [{ step: 1, experimentId: "e1", reagents: [] }] }, callId: "bind" });
     if (call.tool === "render_step" || call.tool === "write_step") {
       const result = response.result as { image?: string; imageFile?: string; artifacts?: { image: string } };
       assert.equal(result.imageFile, undefined, "rendered image paths must not be decoded as source-page base64");

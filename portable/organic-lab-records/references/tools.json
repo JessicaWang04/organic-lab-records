@@ -1,6 +1,380 @@
 [
   {
     "type": "function",
+    "name": "validate_plan",
+    "description": "写入前检查来源实验覆盖、目标、化合物绑定、顺序、one-pot口径和物料结构；缺项先修正record_route/bind_steps，再生成文件。此预检不代表完整文件交付。",
+    "strict": true,
+    "parameters": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  {
+    "type": "function",
+    "name": "record_inventory",
+    "description": "先保存从本次来源观察到的范围内实验、目标和化合物清单，独立于生成计划；one-pot对应一个实验。含来源局部图、可读引文、原文分子式/HRMS、明确立体中心数量和盐组分；未知事实保留null，不删困难步骤。清单登记后保留原观察。",
+    "strict": true,
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "inventory": {
+          "type": "object",
+          "properties": {
+            "compounds": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "origin": {
+                    "type": "string",
+                    "enum": [
+                      "starting",
+                      "intermediate",
+                      "target"
+                    ]
+                  },
+                  "sourceImage": {
+                    "type": "object",
+                    "properties": {
+                      "sourceId": {
+                        "type": "string"
+                      },
+                      "page": {
+                        "type": "integer"
+                      },
+                      "bbox": {
+                        "anyOf": [
+                          {
+                            "type": "array",
+                            "items": {
+                              "type": "number"
+                            }
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "sourceId",
+                      "page",
+                      "bbox"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "citations": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "sourceId": {
+                          "type": "string"
+                        },
+                        "page": {
+                          "type": "integer"
+                        },
+                        "quote": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "sourceId",
+                        "page",
+                        "quote"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "formula": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "formula": {
+                            "type": "string"
+                          },
+                          "adduct": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "mz": {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "formula",
+                          "adduct",
+                          "mz"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "stereo": {
+                    "type": "object",
+                    "properties": {
+                      "scope": {
+                        "type": "string",
+                        "enum": [
+                          "achiral",
+                          "specified",
+                          "relative",
+                          "unspecified"
+                        ]
+                      },
+                      "centers": {
+                        "type": [
+                          "integer",
+                          "null"
+                        ]
+                      },
+                      "doubleBonds": {
+                        "type": [
+                          "integer",
+                          "null"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "scope",
+                      "centers",
+                      "doubleBonds"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "components": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "isomerOf": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "relationship": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "enum": [
+                      "epimer",
+                      "enantiomer",
+                      null
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "label",
+                  "origin",
+                  "sourceImage",
+                  "citations",
+                  "formula",
+                  "stereo",
+                  "components",
+                  "isomerOf",
+                  "relationship"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "experiments": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "paperStep": {
+                    "type": "string"
+                  },
+                  "reactants": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "products": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "handling": {
+                    "type": "string",
+                    "enum": [
+                      "isolated",
+                      "one-pot",
+                      "crude-transfer"
+                    ]
+                  },
+                  "citations": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "sourceId": {
+                          "type": "string"
+                        },
+                        "page": {
+                          "type": "integer"
+                        },
+                        "quote": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "sourceId",
+                        "page",
+                        "quote"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": [
+                  "id",
+                  "paperStep",
+                  "reactants",
+                  "products",
+                  "handling",
+                  "citations"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "targets": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "compounds",
+            "experiments",
+            "targets"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "inventory"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "type": "function",
+    "name": "register_compounds",
+    "description": "批量核对候选与来源观察的分子式、明确立体数量、盐组分和差向异构体关系，登记规范化SMILES及平均MW；同一ID不能漂移为另一结构。可一次提交父结构及其异构体。失败时修复候选，不能降低来源约束。",
+    "strict": true,
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "structures": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "compoundId": {
+                "type": "string"
+              },
+              "smiles": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "compoundId",
+              "smiles"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "structures"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "type": "function",
+    "name": "bind_steps",
+    "description": "将计划步骤绑定来源实验和已登记化合物，自动复用登记结构及底物/产物MW，防止编号漂移。每条物料映射含reagentId和compoundId；底物/产物行均须绑定。已写笔记只接受一致结构，不覆盖。",
+    "strict": true,
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "bindings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "step": {
+                "type": "integer"
+              },
+              "experimentId": {
+                "type": "string"
+              },
+              "reagents": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "reagentId": {
+                      "type": "string"
+                    },
+                    "compoundId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "reagentId",
+                    "compoundId"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "step",
+              "experimentId",
+              "reagents"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "bindings"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "type": "function",
     "name": "search_sources",
     "description": "检索本次全部正文和SI的文本索引。返回来源ID、页码和原文；先按化合物编号或试剂检索，再阅读具体页面，不上传整个SI的全部图谱。",
     "strict": true,
@@ -53,6 +427,54 @@
         "sourceId",
         "page",
         "bbox"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "type": "function",
+    "name": "read_source_pages",
+    "description": "一次读取1至8个独立页面/局部裁剪，复用PDF解码和同一Python进程；返回真实图像，逐图查看。只取本批需要的页，不读取整个SI图谱。",
+    "strict": true,
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "pages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "sourceId": {
+                "type": "string"
+              },
+              "page": {
+                "type": "integer"
+              },
+              "bbox": {
+                "anyOf": [
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    }
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "sourceId",
+              "page",
+              "bbox"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "pages"
       ],
       "additionalProperties": false
     }
@@ -549,6 +971,27 @@
   },
   {
     "type": "function",
+    "name": "inspect_structures",
+    "description": "同一Python进程批量解析1至64个候选，返回规范结构、分子式、平均MW和明确CIP/双键构型摘要。登记时register_compounds已包含这些检查，无需重复调用；具体位点编辑仍用inspect_structure查看原子索引。",
+    "strict": true,
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "smiles": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "smiles"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "type": "function",
     "name": "set_step_structures",
     "description": "为尚未写入记录的一步补齐从来源局部图核对的反应物与产物SMILES，解析成功后更新计划并使旧绘图失效。保留其他步骤；物料表SMILES必须已与对应结构一致，物料修订可在写入前record_route。不可用占位结构绕过来源核对。",
     "strict": true,
@@ -718,6 +1161,27 @@
       },
       "required": [
         "step"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "type": "function",
+    "name": "materialize_steps",
+    "description": "为1至8个不同步骤生成PNG/CDXML并写入笔记。结构登记与绑定完成后使用；每步内部先render再write，不同步修改计划。最多2个独立步骤并发；返回逐步成功/失败，失败步骤不会算完成。重试只选择失败步骤；不能在执行时编辑结构或规模。",
+    "strict": true,
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "steps": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        }
+      },
+      "required": [
+        "steps"
       ],
       "additionalProperties": false
     }

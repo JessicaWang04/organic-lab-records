@@ -32,4 +32,5 @@ jobs:
       - run: npm run test:python
       - run: npm run check-workbench-budget
       - run: npm run build-skill
+      - run: python portable/organic-lab-records/scripts/replay_examples.py --output "${{ runner.temp }}/organic-lab-examples"
       - run: npm run package-skill

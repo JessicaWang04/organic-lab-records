@@ -73,7 +73,7 @@ export function buildStepNote(routeId: string, step: ExperimentStep, artifacts: 
     quality: link(artifacts.quality), scale_mmol: step.scaleMmol, scale_basis: step.scaleBasisId,
     previous_step: link(previous), next_step: link(next), sources: sourceLinks,
     reference_yield: step.referenceYield, reference_yield_scope: step.yieldScope,
-    measured_yield_percent: null, spectra: [], skill_version: "experiment-records/1.0.1", harness_version: "organic-lab/0.1.2"
+    measured_yield_percent: null, spectra: [], skill_version: "experiment-records/2.0.0", harness_version: "organic-lab/0.2.0"
   };
   const referenceSpectra = artifacts.referenceSpectra ?? [];
   Object.assign(frontmatter, { reference_spectra: referenceSpectra.map(path => link(path)) });

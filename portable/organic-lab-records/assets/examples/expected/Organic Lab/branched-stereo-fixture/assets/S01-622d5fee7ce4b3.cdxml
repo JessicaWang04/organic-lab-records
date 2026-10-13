@@ -1,0 +1,86 @@
+<?xml version='1.0' encoding='utf-8'?>
+<CDXML BondLength="16.19194" LabelFont="3" LabelSize="10" LabelFace="96" CaptionFont="3" CaptionSize="10" CaptionFace="0" LineWidth="0.6" BondSpacing="18" InterpretChemically="no" PrintMargins="36 36 36 36" BoundingBox="24.00000 24.00000 514.99998 90.42118">
+  <fonttable>
+    <font id="3" name="Arial" charset="utf-8" />
+  </fonttable>
+  <page id="1" BoundingBox="0 0 540 720" WidthPages="1" HeightPages="1">
+    <fragment id="10">
+      <n id="11" p="34.00000 62.03754" Element="6" />
+      <n id="12" p="48.02262 53.94157" Element="6" />
+      <n id="13" p="48.02262 37.74963" Element="8" NumHydrogens="1">
+        <t id="14" p="46.22352 39.54873">
+          <s font="3" size="10" face="96">OH</s>
+        </t>
+      </n>
+      <n id="15" p="62.04526 62.03754" Element="6" />
+      <n id="16" p="62.04526 78.22948" Element="7" NumHydrogens="2">
+        <t id="17" p="60.24615 80.02858">
+          <s font="3" size="10" face="96">NH2</s>
+        </t>
+      </n>
+      <n id="18" p="76.06789 53.94157" Element="6" />
+      <n id="19" p="76.06789 37.74963" Element="8" NumHydrogens="0">
+        <t id="20" p="74.26879 39.54873">
+          <s font="3" size="10" face="96">O</s>
+        </t>
+      </n>
+      <n id="21" p="90.09052 62.03754" Element="8" NumHydrogens="1">
+        <t id="22" p="88.29141 63.83664">
+          <s font="3" size="10" face="96">OH</s>
+        </t>
+      </n>
+      <b id="23" B="12" E="11" Order="1" Display="WedgedHashBegin" />
+      <b id="24" B="12" E="13" Order="1" />
+      <b id="25" B="12" E="15" Order="1" />
+      <b id="26" B="15" E="16" Order="1" Display="WedgeBegin" />
+      <b id="27" B="15" E="18" Order="1" />
+      <b id="28" B="18" E="19" Order="2" />
+      <b id="29" B="18" E="21" Order="1" />
+    </fragment>
+    <fragment id="30">
+      <n id="31" p="434.68448 60.63638" Element="6" />
+      <n id="32" p="448.93227 52.94356" Element="8" NumHydrogens="0">
+        <t id="33" p="447.13316 54.74267">
+          <s font="3" size="10" face="96">O</s>
+        </t>
+      </n>
+      <n id="34" p="462.71834 61.43610" Element="6" />
+      <n id="35" p="462.25661 77.62145" Element="8" NumHydrogens="0">
+        <t id="36" p="460.45751 79.42056">
+          <s font="3" size="10" face="96">O</s>
+        </t>
+      </n>
+      <n id="37" p="476.96613 53.74328" Element="6" />
+      <n id="38" p="477.42785 37.55793" Element="7" NumHydrogens="2">
+        <t id="39" p="475.62875 39.35703">
+          <s font="3" size="10" face="96">NH2</s>
+        </t>
+      </n>
+      <n id="40" p="490.75220 62.23582" Element="6" />
+      <n id="41" p="504.99998 54.54301" Element="6" />
+      <n id="42" p="490.29047 78.42118" Element="8" NumHydrogens="1">
+        <t id="43" p="488.49137 80.22028">
+          <s font="3" size="10" face="96">OH</s>
+        </t>
+      </n>
+      <b id="44" B="31" E="32" Order="1" />
+      <b id="45" B="32" E="34" Order="1" />
+      <b id="46" B="34" E="35" Order="2" />
+      <b id="47" B="34" E="37" Order="1" />
+      <b id="48" B="37" E="38" Order="1" Display="WedgeBegin" />
+      <b id="49" B="37" E="40" Order="1" />
+      <b id="50" B="40" E="41" Order="1" Display="WedgedHashBegin" />
+      <b id="51" B="40" E="42" Order="1" />
+    </fragment>
+    <arrow id="52" Head3D="370.89150 57.98955 0" Tail3D="160.99599 57.98955 0" ArrowheadHead="Full" ArrowheadType="Solid" HeadSize="1000" FillType="None" BoundingBox="156.99599 53.98955 374.89150 61.98955" />
+    <t id="53" p="265.94374 37.00000" CaptionJustification="Center" Justification="Center" InterpretChemically="no">
+      <s font="3" size="10">SYNTHETIC FIXTURE</s>
+    </t>
+    <t id="54" p="265.94374 77.77970" CaptionJustification="Center" Justification="Center" InterpretChemically="no">
+      <s font="3" size="10">crude-transfer</s>
+    </t>
+    <scheme id="55">
+      <step id="56" ReactionStepReactants="10" ReactionStepProducts="30" ReactionStepArrows="52" ReactionStepObjectsAboveArrow="53" ReactionStepObjectsBelowArrow="54" />
+    </scheme>
+  </page>
+</CDXML>

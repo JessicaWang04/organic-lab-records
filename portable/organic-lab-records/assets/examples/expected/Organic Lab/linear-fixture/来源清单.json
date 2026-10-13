@@ -1,0 +1,203 @@
+{
+  "compounds": [
+    {
+      "id": "A",
+      "label": "A ethanol",
+      "origin": "starting",
+      "sourceImage": {
+        "sourceId": "si",
+        "page": 1,
+        "bbox": [
+          0.05,
+          0.065,
+          0.95,
+          0.375
+        ]
+      },
+      "citations": [
+        {
+          "sourceId": "si",
+          "page": 1,
+          "quote": "Synthetic compound A: formula C2H6O; specified centers 0; specified double bonds 0; components 1."
+        }
+      ],
+      "formula": {
+        "formula": "C2H6O",
+        "adduct": null,
+        "mz": null
+      },
+      "stereo": {
+        "scope": "achiral",
+        "centers": 0,
+        "doubleBonds": 0
+      },
+      "components": 1,
+      "isomerOf": null,
+      "relationship": null
+    },
+    {
+      "id": "B",
+      "label": "B acetaldehyde",
+      "origin": "intermediate",
+      "sourceImage": {
+        "sourceId": "si",
+        "page": 2,
+        "bbox": [
+          0.05,
+          0.065,
+          0.95,
+          0.375
+        ]
+      },
+      "citations": [
+        {
+          "sourceId": "si",
+          "page": 2,
+          "quote": "Synthetic compound B: formula C2H4O; specified centers 0; specified double bonds 0; components 1."
+        }
+      ],
+      "formula": {
+        "formula": "C2H4O",
+        "adduct": null,
+        "mz": null
+      },
+      "stereo": {
+        "scope": "achiral",
+        "centers": 0,
+        "doubleBonds": 0
+      },
+      "components": 1,
+      "isomerOf": null,
+      "relationship": null
+    },
+    {
+      "id": "C",
+      "label": "C acetic acid",
+      "origin": "intermediate",
+      "sourceImage": {
+        "sourceId": "si",
+        "page": 3,
+        "bbox": [
+          0.05,
+          0.065,
+          0.95,
+          0.375
+        ]
+      },
+      "citations": [
+        {
+          "sourceId": "si",
+          "page": 3,
+          "quote": "Synthetic compound C: formula C2H4O2; specified centers 0; specified double bonds 0; components 1."
+        }
+      ],
+      "formula": {
+        "formula": "C2H4O2",
+        "adduct": null,
+        "mz": null
+      },
+      "stereo": {
+        "scope": "achiral",
+        "centers": 0,
+        "doubleBonds": 0
+      },
+      "components": 1,
+      "isomerOf": null,
+      "relationship": null
+    },
+    {
+      "id": "D",
+      "label": "D ethyl acetate",
+      "origin": "target",
+      "sourceImage": {
+        "sourceId": "si",
+        "page": 4,
+        "bbox": [
+          0.05,
+          0.065,
+          0.95,
+          0.375
+        ]
+      },
+      "citations": [
+        {
+          "sourceId": "si",
+          "page": 4,
+          "quote": "Synthetic compound D: formula C4H8O2; specified centers 0; specified double bonds 0; components 1."
+        }
+      ],
+      "formula": {
+        "formula": "C4H8O2",
+        "adduct": null,
+        "mz": null
+      },
+      "stereo": {
+        "scope": "achiral",
+        "centers": 0,
+        "doubleBonds": 0
+      },
+      "components": 1,
+      "isomerOf": null,
+      "relationship": null
+    }
+  ],
+  "experiments": [
+    {
+      "id": "E1",
+      "paperStep": "E1",
+      "reactants": [
+        "A"
+      ],
+      "products": [
+        "B"
+      ],
+      "handling": "isolated",
+      "citations": [
+        {
+          "sourceId": "si",
+          "page": 5,
+          "quote": "Synthetic experiment E1: A to B; handling isolated; 1 simulated stage(s). Reference basis 1.00 mmol is synthetic. No experimental conditions or measured yields are supplied."
+        }
+      ]
+    },
+    {
+      "id": "E2",
+      "paperStep": "E2",
+      "reactants": [
+        "B"
+      ],
+      "products": [
+        "C"
+      ],
+      "handling": "isolated",
+      "citations": [
+        {
+          "sourceId": "si",
+          "page": 6,
+          "quote": "Synthetic experiment E2: B to C; handling isolated; 1 simulated stage(s). Reference basis 1.00 mmol is synthetic. No experimental conditions or measured yields are supplied."
+        }
+      ]
+    },
+    {
+      "id": "E3",
+      "paperStep": "E3",
+      "reactants": [
+        "C"
+      ],
+      "products": [
+        "D"
+      ],
+      "handling": "isolated",
+      "citations": [
+        {
+          "sourceId": "si",
+          "page": 7,
+          "quote": "Synthetic experiment E3: C to D; handling isolated; 1 simulated stage(s). Reference basis 1.00 mmol is synthetic. No experimental conditions or measured yields are supplied."
+        }
+      ]
+    }
+  ],
+  "targets": [
+    "D"
+  ]
+}

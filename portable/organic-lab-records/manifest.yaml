@@ -1,0 +1,21 @@
+version: 1
+always_load:
+  - core/workflow.md
+  - core/chemistry.md
+  - references/delivery.md
+source_formats:
+  doi-link: [sources/doi-link.md]
+  pdf-text: [sources/pdf-text.md]
+  scanned-pdf: [sources/scanned-pdf.md]
+  screenshot: [sources/screenshot.md]
+topics:
+  stereo: [references/stereochemistry.md]
+  salts: [references/material-identity.md]
+  one-pot: [references/route-semantics.md]
+  quantities: [references/quantities.md]
+  conflicts: [references/source-conflicts.md]
+  recovery: [references/recovery.md]
+  speed: [references/parallelism.md]
+  recognition: [references/recognition.md]
+  examples: [references/worked-examples.md]
+  commands: [references/commands.md]

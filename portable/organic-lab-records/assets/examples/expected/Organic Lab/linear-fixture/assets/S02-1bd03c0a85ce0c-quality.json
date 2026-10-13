@@ -1,0 +1,59 @@
+{
+  "chemistry": {
+    "graphRoundtrip": "passed",
+    "sourceImageFidelity": "not-machine-verified",
+    "stereoRoundtrip": "passed",
+    "cdxmlLayout": {
+      "canvasFit": "passed",
+      "drawingBounds": [
+        24,
+        24,
+        515,
+        85.06924
+      ],
+      "pageBounds": [
+        0,
+        0,
+        540,
+        720
+      ],
+      "widthPages": 1,
+      "heightPages": 1,
+      "coordinateScale": 0.6480771005153656,
+      "captionInterpretation": "disabled"
+    },
+    "reactionImage": {
+      "kind": "single-reaction",
+      "width": 991,
+      "height": 266,
+      "paddingPx": 20,
+      "inkBounds": [
+        20,
+        20,
+        971,
+        246
+      ]
+    }
+  },
+  "issues": [
+    {
+      "code": "reported_source_conflict",
+      "field": "conflicts",
+      "severity": "review",
+      "message": "本记录为合成测试材料，不能用于真实实验。"
+    },
+    {
+      "code": "image_fidelity_review",
+      "field": "structures",
+      "severity": "review",
+      "message": "人工核对结构、立体化学、图文对应和原图条件"
+    }
+  ],
+  "properties": {
+    "reviews": [
+      "B acetaldehyde：常温形态待补。",
+      "C acetic acid：常温形态待补。"
+    ]
+  },
+  "step": 2
+}

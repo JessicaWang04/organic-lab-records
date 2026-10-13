@@ -10,6 +10,7 @@ import sys
 import unicodedata
 import xml.etree.ElementTree as ET
 from collections import Counter
+from contextlib import ExitStack
 from functools import lru_cache
 from pathlib import Path
 
@@ -34,6 +35,113 @@ def identity(mol):
     for atom in copy.GetAtoms():
         atom.SetAtomMapNum(0)
     return Chem.MolToSmiles(copy, isomericSmiles=True)
+
+
+def stereo_summary(mol):
+    Chem.AssignStereochemistry(mol, cleanIt=True, force=True)
+    centers = [{"atom": i, "cip": label} for i, label in Chem.FindMolChiralCenters(mol, includeUnassigned=True) if label != "?"]
+    double_bonds = [{"bond": b.GetIdx(), "stereo": str(b.GetStereo())} for b in mol.GetBonds() if b.GetStereo() in (Chem.BondStereo.STEREOE, Chem.BondStereo.STEREOZ, Chem.BondStereo.STEREOCIS, Chem.BondStereo.STEREOTRANS)]
+    return {"centers": centers, "doubleBonds": double_bonds}
+
+
+def component_identities(molecules):
+    return Counter(identity(part) for mol in molecules for part in Chem.GetMolFrags(mol, asMols=True))
+
+
+def isomer_relationship(first, second, relationship):
+    a, b = molecule(first), molecule(second)
+    plain_a, plain_b = Chem.Mol(a), Chem.Mol(b)
+    Chem.RemoveStereochemistry(plain_a)
+    Chem.RemoveStereochemistry(plain_b)
+    if identity(plain_a) != identity(plain_b):
+        raise ValueError("isomer_graph_mismatch: 差向异构体/对映体必须保持连接、同位素和盐型")
+    Chem.AssignStereochemistry(a, cleanIt=True, force=True)
+    Chem.AssignStereochemistry(b, cleanIt=True, force=True)
+    possibilities = set()
+    matches = b.GetSubstructMatches(a, useChirality=False, uniquify=False, maxMatches=257)
+    if len(matches) > 256:
+        raise ValueError("isomer_mapping_ambiguous: 对称性导致映射过多，需要核对具体位点")
+    for match in matches:
+        differences, assigned, lost = 0, 0, False
+        for atom in a.GetAtoms():
+            counterpart = b.GetAtomWithIdx(match[atom.GetIdx()])
+            left = atom.GetProp("_CIPCode") if atom.HasProp("_CIPCode") else None
+            right = counterpart.GetProp("_CIPCode") if counterpart.HasProp("_CIPCode") else None
+            if (left is None) != (right is None):
+                lost = True
+            if left is not None and right is not None:
+                assigned += 1
+                differences += left != right
+        for bond in a.GetBonds():
+            other = b.GetBondBetweenAtoms(match[bond.GetBeginAtomIdx()], match[bond.GetEndAtomIdx()])
+            if bond.GetStereo() != other.GetStereo():
+                lost = True
+        if not lost:
+            possibilities.add((differences, assigned))
+    if len(possibilities) != 1:
+        raise ValueError("isomer_mapping_ambiguous: 立体映射不唯一或立体信息丢失")
+    differences, assigned = possibilities.pop()
+    valid = assigned > 1 and differences == 1 if relationship == "epimer" else assigned > 0 and differences == assigned
+    if not valid:
+        raise ValueError(f"isomer_relationship_mismatch: {relationship} 实际翻转{differences}/{assigned}个中心")
+    return {"relationship": relationship, "invertedCenters": differences, "specifiedCenters": assigned}
+
+
+def verify_compounds(request):
+    observations = {c["id"]: c for c in request["observations"]}
+    structures = {c["id"]: c["smiles"] for c in request["structures"]}
+    if not observations or len(observations) != len(request["observations"]) or set(observations) != set(structures) or len(structures) != len(request["structures"]) or len(structures) > 160:
+        raise ValueError("compound_batch_invalid")
+    output = []
+    for cid, smiles in structures.items():
+        observation = observations[cid]
+        mol = molecule(smiles)
+        formula = rdMolDescriptors.CalcMolFormula(mol)
+        if observation.get("components") is not None and observation["components"] != len(Chem.GetMolFrags(mol)):
+            raise ValueError(f"compound_component_mismatch: {cid} 盐型/组分数量与来源观察不一致")
+        source_formula = observation.get("formula")
+        if source_formula:
+            calculated = formula_properties(source_formula)
+            if calculated["formula"] != formula:
+                raise ValueError(f"compound_formula_mismatch: {cid} 来源式{calculated['formula']}，候选结构式{formula}")
+        stereo = stereo_summary(mol)
+        expected = observation["stereo"]
+        if expected["scope"] in ("specified", "relative") and (expected["centers"] is None or expected["doubleBonds"] is None):
+            raise ValueError(f"stereo_observation_missing: {cid}")
+        for field, actual in (("centers", len(stereo["centers"])), ("doubleBonds", len(stereo["doubleBonds"]))):
+            count = 0 if expected["scope"] in ("achiral", "unspecified") else expected[field]
+            if count is not None and count != actual:
+                raise ValueError(f"compound_stereo_mismatch: {cid} 来源明确{count}个{field}，候选{actual}个；不能补造或丢失构型")
+        if observation.get("isomerOf"):
+            parent = structures.get(observation["isomerOf"])
+            if parent is None:
+                raise ValueError(f"isomer_parent_missing: {cid} 需先登记或同时提交{observation['isomerOf']}")
+            isomer_relationship(parent, smiles, observation["relationship"])
+        output.append({"id": cid, "smiles": identity(mol), "formula": formula, "mw": Descriptors.MolWt(mol),
+                       "stereoCenters": len(stereo["centers"]), "stereoDoubleBonds": len(stereo["doubleBonds"])})
+    return {"compounds": output}
+
+
+def check_bound_structures(request):
+    if "expectedReactants" not in request:
+        return
+    def changed(smiles):
+        current = identity(molecule(smiles))
+        for edit in request.get("edits", []):
+            if current == identity(molecule(edit["before"])):
+                current = identity(molecule(edit["after"]))
+        return current
+    for field, expected in (("reactants", "expectedReactants"), ("products", "expectedProducts")):
+        if Counter(identity(molecule(s)) for s in request[field]) != Counter(changed(s) for s in request[expected]):
+            raise ValueError("bound_structure_mismatch: 本步结构与登记化合物/原生编辑回执不一致")
+    for row in request.get("reagentStructures", []):
+        if not row.get("actual") or not row.get("expected") or identity(molecule(row["actual"])) != changed(row["expected"]):
+            raise ValueError(f"reagent_structure_mismatch: {row['id']} 与化合物绑定不一致")
+        mol = molecule(row["actual"])
+        if row.get("mw") is not None and (not isinstance(row["mw"], (int, float)) or not math.isfinite(row["mw"]) or abs(row["mw"] - Descriptors.MolWt(mol)) > .02):
+            raise ValueError(f"reagent_mw_mismatch: {row['id']} 的平均MW与实际结构不一致")
+        if row.get("formula") is not None and row["formula"] != rdMolDescriptors.CalcMolFormula(mol):
+            raise ValueError(f"reagent_formula_mismatch: {row['id']} 的分子式与实际结构不一致")
 
 
 def inspect(smiles):
@@ -336,6 +444,7 @@ def reaction_png(request, reactants, products):
 
 
 def render_step(request):
+    check_bound_structures(request)
     reactants = [molecule(s) for s in request["reactants"]]
     products = [molecule(s) for s in request["products"]]
     if not reactants or not products or len(reactants) + len(products) > 12:
@@ -371,7 +480,7 @@ def render_step(request):
     ET.indent(root)
     cdxml = ET.tostring(root, encoding="utf-8", xml_declaration=True).decode("utf-8")
     parsed = Chem.MolsFromCDXML(cdxml)
-    if Counter(map(identity, parsed)) != Counter(map(identity, reactants + products)):
+    if component_identities(parsed) != component_identities(reactants + products):
         raise ValueError("cdxml_roundtrip_failed: 导出改变了结构或立体化学")
     png, image_layout = reaction_png(request, reactants, products)
     return {"cdxml": cdxml, "png": base64.b64encode(png).decode(), "properties": [inspect(identity(m)) for m in reactants + products],
@@ -380,6 +489,7 @@ def render_step(request):
 
 
 def verify_step_artifacts(request):
+    check_bound_structures(request)
     expected = [molecule(s) for s in request["reactants"] + request["products"]]
     if not request["reactants"] or not request["products"] or len(expected) > 12:
         raise ValueError("structure_missing: 每一步必须有反应物和产物结构")
@@ -419,7 +529,7 @@ def verify_step_artifacts(request):
         for fragment_element in selected:
             subset_page.append(copy.deepcopy(fragment_element))
         actual = Chem.MolsFromCDXML(ET.tostring(subset, encoding="unicode"))
-        if Counter(map(identity, actual)) != Counter(identity(molecule(s)) for s in smiles):
+        if component_identities(actual) != component_identities([molecule(s) for s in smiles]):
             raise ValueError("cdxml_graph_mismatch: 原子、键、反应方向或立体化学与本步结构不一致")
     if set(scheme.get("ReactionStepReactants", "").split() + scheme.get("ReactionStepProducts", "").split()) != {f.get("id") for f in fragments}:
         raise ValueError("cdxml_reaction_mismatch: 存在未关联或复用的分子图")
@@ -521,8 +631,56 @@ def pdf_operation(request):
 
 def execute(request):
     operation = request.get("op")
+    if operation == "source_pages":
+        import pymupdf
+        pages = request["pages"]
+        if not isinstance(pages, list) or not 1 <= len(pages) <= 8:
+            raise ValueError("page_batch_invalid")
+        sources = request["sources"]
+        if not isinstance(sources, list) or not 1 <= len(sources) <= 8 or len({s["id"] for s in sources}) != len(sources):
+            raise ValueError("source_batch_invalid")
+        decoded = {s["id"]: {"mime": s["mime"], "data": base64.b64decode(s["data"], validate=True)} for s in sources}
+        if sum(len(s["data"]) for s in decoded.values()) > 80 * 1024 * 1024:
+            raise ValueError("source_batch_too_large")
+        output, documents = [], {}
+        with ExitStack() as stack:
+            for selected in pages:
+                source = decoded.get(selected["sourceId"])
+                if source is None:
+                    raise ValueError("source_not_found")
+                number, bbox = selected["page"], selected.get("bbox")
+                if bbox is not None and (len(bbox) != 4 or not all(isinstance(v, (int, float)) and 0 <= v <= 1 for v in bbox) or bbox[0] >= bbox[2] or bbox[1] >= bbox[3]):
+                    raise ValueError("invalid_bbox")
+                if source["mime"] == "application/pdf":
+                    if selected["sourceId"] not in documents:
+                        documents[selected["sourceId"]] = stack.enter_context(pymupdf.open(stream=source["data"], filetype="pdf"))
+                    document = documents[selected["sourceId"]]
+                    if not isinstance(number, int) or not 1 <= number <= len(document):
+                        raise ValueError("invalid_pdf_page")
+                    page = document[number - 1]
+                    clip = page.rect if bbox is None else pymupdf.Rect(bbox[0] * page.rect.width, bbox[1] * page.rect.height, bbox[2] * page.rect.width, bbox[3] * page.rect.height)
+                    png = base64.b64encode(page.get_pixmap(matrix=pymupdf.Matrix(2, 2), clip=clip, alpha=False).tobytes("png")).decode()
+                    text_value = page.get_text(sort=True)
+                else:
+                    if number != 1:
+                        raise ValueError("invalid_image_page")
+                    cropped = execute({"op": "image_crop", "data": base64.b64encode(source["data"]).decode(), "bbox": bbox})
+                    png, text_value = cropped["png"], cropped["text"]
+                output.append({"sourceId": selected["sourceId"], "page": number, "text": text_value, "image": png, "mime": "image/png"})
+        return {"pages": output}
     if operation == "inspect":
         return inspect(request["smiles"])
+    if operation == "inspect_structures":
+        smiles_list = request["smiles"]
+        if not isinstance(smiles_list, list) or not 1 <= len(smiles_list) <= 64:
+            raise ValueError("structure_batch_invalid")
+        return {"structures": [{"smiles": identity(molecule(s)), "formula": rdMolDescriptors.CalcMolFormula(molecule(s)),
+                                 "mw": Descriptors.MolWt(molecule(s)), "stereo": stereo_summary(molecule(s))} for s in smiles_list]}
+    if operation == "verify_compounds":
+        return verify_compounds(request)
+    if operation == "check_binding":
+        check_bound_structures(request)
+        return {"binding": "passed"}
     if operation == "formula_properties":
         return formula_properties(request)
     if operation == "edit":

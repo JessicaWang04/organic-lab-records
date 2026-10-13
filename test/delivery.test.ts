@@ -5,7 +5,7 @@ import { PythonChemistry, Chemistry } from "../src/chemistry";
 import { ExperimentStep, FileStore } from "../src/domain";
 import { AgentRunner, SessionState } from "../src/runner";
 import { auditDelivery } from "../src/delivery";
-import { fixtureDeliveryVerification } from "./delivery-fixture";
+import { fixtureDeliveryVerification, installFixtureInventory } from "./delivery-fixture";
 
 class MemoryStore implements FileStore {
   files = new Map<string, string>(); bytes = new Map<string, Uint8Array>();
@@ -76,6 +76,9 @@ test("quality flags and incomplete verifier responses never grant acceptance", a
 });
 test("real PNG and editable CDXML pass, while changed bytes and stale success receipts fail", async () => {
   const f = fixture(native);
+  installFixtureInventory(f.state); f.state.compounds = {};
+  await f.runner.execute("register_compounds", { structures: [{ compoundId: "c1", smiles: f.state.plan!.steps[0].reactants[0] }, { compoundId: "c2", smiles: f.state.plan!.steps[0].products[0] }] });
+  await f.runner.execute("bind_steps", { bindings: Object.values(f.state.bindings!) });
   await f.runner.execute("render_step", { step: 1 }); await f.runner.execute("write_step", { step: 1 });
   const finished = await f.runner.execute("finish_route", {});
   assert.equal(f.state.status, "completed");
@@ -87,5 +90,5 @@ test("real PNG and editable CDXML pass, while changed bytes and stale success re
   assert.equal(f.state.status, "deliveryIncomplete");
   f.store.bytes.set(artifacts.image, originalImage);
   f.state.plan!.steps[0].products = ["N[C@H](C)C(=O)OC"];
-  await assert.rejects(f.runner.execute("write_step", { step: 1 }), /cdxml_graph_mismatch/);
+  await assert.rejects(f.runner.execute("write_step", { step: 1 }), /bound_structure_mismatch/);
 });

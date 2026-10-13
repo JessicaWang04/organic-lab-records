@@ -1,0 +1,17 @@
+{
+  "id": "linear-fixture",
+  "title": "Synthetic linear route — harness fixture only",
+  "synthetic": true,
+  "compounds": [
+    {"id":"A","label":"A ethanol","smiles":"CCO","origin":"starting","centers":0},
+    {"id":"B","label":"B acetaldehyde","smiles":"CC=O","origin":"intermediate","centers":0},
+    {"id":"C","label":"C acetic acid","smiles":"CC(=O)O","origin":"intermediate","centers":0},
+    {"id":"D","label":"D ethyl acetate","smiles":"CC(=O)OCC","origin":"target","centers":0}
+  ],
+  "experiments": [
+    {"id":"E1","reactants":["A"],"products":["B"],"handling":"isolated","stages":1},
+    {"id":"E2","reactants":["B"],"products":["C"],"handling":"isolated","stages":1},
+    {"id":"E3","reactants":["C"],"products":["D"],"handling":"isolated","stages":1}
+  ],
+  "targets":["D"]
+}

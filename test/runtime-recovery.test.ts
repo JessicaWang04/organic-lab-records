@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
-import { fixtureDeliveryVerification } from "./delivery-fixture";
+import { fixtureDeliveryVerification, fixtureInventory } from "./delivery-fixture";
 import { test } from "node:test";
 import { ExperimentStep, FileStore, Reagent, RoutePlan } from "../src/domain";
-import { AgentRunner, ProtocolItem, SessionState, Transport } from "../src/runner";
+import { AgentRunner, ProtocolItem, SessionState, Transport, withoutImages } from "../src/runner";
 
 class MemoryStore implements FileStore {
   files = new Map<string, string>();
@@ -37,7 +37,7 @@ class MemoryStore implements FileStore {
 
 const initial = (): SessionState => ({
   id: "recovery-test", dir: "MemoryRoute", prompt: "fixture", status: "running", turns: 0, calls: 0,
-  sources: [], context: [], plan: null, rendered: {}, written: {}, receipts: {}, events: [], question: null
+  sources: [{ id: "fixture-source", name: "synthetic fixture", mime: "image/png", path: "fixture.png", pages: [] }], context: [], plan: null, rendered: {}, written: {}, receipts: {}, events: [], question: null
 });
 const reagent = (): Reagent => ({
   id: "SM", name: "substrate", role: "substrate", smiles: "CCO", mw: null, equivalents: 1,
@@ -74,7 +74,7 @@ function assertAllCallsPaired(state: SessionState): void {
 const noModelRequests: Transport = { turn: async () => { throw new Error("unexpected model request during recovery"); } };
 const noChemistry = { call: async <T>(request: Record<string, unknown>): Promise<T> => fixtureDeliveryVerification(request) as T };
 const renderingChemistry = { call: async <T>(request: Record<string, unknown>): Promise<T> => {
-  if (request.op === "verify_delivery") return fixtureDeliveryVerification(request) as T;
+  if (["verify_delivery", "verify_compounds", "check_binding"].includes(String(request.op))) return fixtureDeliveryVerification(request) as T;
   assert.equal(request.op, "render_step");
   return { png: Buffer.from("fixture png").toString("base64"), cdxml: "fixture cdxml", properties: [], quality: { fixture: true } } as T;
 } };
@@ -263,19 +263,31 @@ class AuditedStore extends MemoryStore {
 }
 
 const routeTurn = (): ProtocolItem[] => [
+  call("record_inventory", { inventory: fixtureInventory([step()]) }, "inventory"),
+  call("register_compounds", { structures: [{ compoundId: "c1", smiles: "CCO" }, { compoundId: "c2", smiles: "CCOC(C)=O" }] }, "compounds"),
   call("record_route", { plan: plan() }, "route-plan"),
+  call("bind_steps", { bindings: [{ step: 1, experimentId: "e1", reagents: [] }] }, "bind"),
   call("render_step", { step: 1 }, "route-render"),
   call("write_step", { step: 1 }, "route-write"),
   call("finish_route", {}, "route-finish")
 ];
+test("source payload filtering retains artifact paths and native write receipts stay text", async () => {
+  const payload = { image: "Route/assets/S01.png", pages: [{ image: "iVBORw0KGgoFAKE", mime: "image/png" }], artifacts: { image: "a.png" } };
+  assert.deepEqual(withoutImages(payload), { image: "Route/assets/S01.png", pages: [{ mime: "image/png" }], artifacts: { image: "a.png" } });
+  const state = initial();
+  await new AgentRunner(state, new MemoryStore(), renderingChemistry, { turn: async () => ({ output: routeTurn() }) }, () => {}, 1, 7).run();
+  const writeReceipt = outputs(state, "route-write")[0];
+  assert.equal(typeof writeReceipt.output, "string");
+  assert.equal(JSON.parse(String(writeReceipt.output)).image, state.rendered[1].image);
+});
 
 test("native route flow persists paired outputs and creates note gallery and linked artifacts", async () => {
   const state = initial(); const store = new AuditedStore(); let modelRequests = 0;
   const transport: Transport = { turn: async () => { modelRequests++; return { output: routeTurn() }; } };
-  const runner = new AgentRunner(state, store, renderingChemistry, transport, () => undefined, 1, 4);
+  const runner = new AgentRunner(state, store, renderingChemistry, transport, () => undefined, 1, 7);
   await runner.run();
   assert.equal(state.status, "completed"); assert.equal(modelRequests, 1);
-  assert.equal(state.calls, 4); assert.equal(state.turns, 1); assertAllCallsPaired(state);
+  assert.equal(state.calls, 7); assert.equal(state.turns, 1); assertAllCallsPaired(state);
   const note = await store.read(state.written[1]);
   assert.ok(note.includes(`![[${state.rendered[1].image}]]`));
   assert.ok(note.includes(state.rendered[1].cdxml!));
@@ -289,11 +301,11 @@ test("native route flow persists paired outputs and creates note gallery and lin
 test("log persistence failure after finish_route preserves completion when the session is restored", async () => {
   const state = initial(); const store = new AuditedStore(); store.failCompletionLogOnce = true;
   const transport: Transport = { turn: async () => ({ output: routeTurn() }) };
-  await assert.rejects(new AgentRunner(state, store, renderingChemistry, transport, () => undefined, 1, 4).run(), /fixture_completion_log_failure/);
+  await assert.rejects(new AgentRunner(state, store, renderingChemistry, transport, () => undefined, 1, 7).run(), /fixture_completion_log_failure/);
   assert.equal(state.status, "completed"); assertAllCallsPaired(state);
   const restored: SessionState = JSON.parse(await store.read(`${state.dir}/会话状态.json`));
   await new AgentRunner(restored, store, noChemistry, noModelRequests, () => undefined, 32, 128).run();
-  assert.equal(restored.status, "completed"); assert.equal(restored.calls, 4); assertAllCallsPaired(restored);
+  assert.equal(restored.status, "completed"); assert.equal(restored.calls, 7); assertAllCallsPaired(restored);
 });
 
 test("legacy recovered output is paired before the next model request", async () => {

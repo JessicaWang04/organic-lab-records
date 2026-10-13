@@ -1,0 +1,40 @@
+<?xml version='1.0' encoding='utf-8'?>
+<CDXML BondLength="17.49808" LabelFont="3" LabelSize="10" LabelFace="96" CaptionFont="3" CaptionSize="10" CaptionFace="0" LineWidth="0.6" BondSpacing="18" InterpretChemically="no" PrintMargins="36 36 36 36" BoundingBox="24.00000 24.00000 515.00000 85.06924">
+  <fonttable>
+    <font id="3" name="Arial" charset="utf-8" />
+  </fonttable>
+  <page id="1" BoundingBox="0 0 540 720" WidthPages="1" HeightPages="1">
+    <fragment id="10">
+      <n id="11" p="34.00000 64.05722" Element="6" />
+      <n id="12" p="49.15378 55.30818" Element="6" />
+      <n id="13" p="64.30757 64.05722" Element="8" NumHydrogens="1">
+        <t id="14" p="62.36334 66.00145">
+          <s font="3" size="10" face="96">OH</s>
+        </t>
+      </n>
+      <b id="15" B="11" E="12" Order="1" />
+      <b id="16" B="12" E="13" Order="1" />
+    </fragment>
+    <fragment id="17">
+      <n id="18" p="474.69242 64.05722" Element="6" />
+      <n id="19" p="489.84621 55.30818" Element="6" />
+      <n id="20" p="505.00000 64.05722" Element="8" NumHydrogens="0">
+        <t id="21" p="503.05576 66.00145">
+          <s font="3" size="10" face="96">O</s>
+        </t>
+      </n>
+      <b id="22" B="18" E="19" Order="1" />
+      <b id="23" B="19" E="20" Order="2" />
+    </fragment>
+    <arrow id="24" Head3D="382.91349 59.68270 0" Tail3D="156.08650 59.68270 0" ArrowheadHead="Full" ArrowheadType="Solid" HeadSize="1000" FillType="None" BoundingBox="152.08650 55.68270 386.91349 63.68270" />
+    <t id="25" p="269.50000 37.00000" CaptionJustification="Center" Justification="Center" InterpretChemically="no">
+      <s font="3" size="10">SYNTHETIC FIXTURE</s>
+    </t>
+    <t id="26" p="269.50000 81.06924" CaptionJustification="Center" Justification="Center" InterpretChemically="no">
+      <s font="3" size="10">isolated</s>
+    </t>
+    <scheme id="27">
+      <step id="28" ReactionStepReactants="10" ReactionStepProducts="17" ReactionStepArrows="24" ReactionStepObjectsAboveArrow="25" ReactionStepObjectsBelowArrow="26" />
+    </scheme>
+  </page>
+</CDXML>

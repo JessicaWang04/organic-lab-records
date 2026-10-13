@@ -1,0 +1,108 @@
+<?xml version='1.0' encoding='utf-8'?>
+<CDXML BondLength="15.81055" LabelFont="3" LabelSize="10" LabelFace="96" CaptionFont="3" CaptionSize="10" CaptionFace="0" LineWidth="0.6" BondSpacing="18" InterpretChemically="no" PrintMargins="36 36 36 36" BoundingBox="24.00000 24.00000 515.00000 120.07112">
+  <fonttable>
+    <font id="3" name="Arial" charset="utf-8" />
+  </fonttable>
+  <page id="1" BoundingBox="0 0 540 720" WidthPages="1" HeightPages="1">
+    <fragment id="10">
+      <n id="11" p="34.00000 74.62004" Element="6" />
+      <n id="12" p="47.91219 67.10842" Element="8" NumHydrogens="0">
+        <t id="13" p="46.15547 68.86515">
+          <s font="3" size="10" face="96">O</s>
+        </t>
+      </n>
+      <n id="14" p="61.37354 75.40092" Element="6" />
+      <n id="15" p="60.92270 91.20504" Element="8" NumHydrogens="0">
+        <t id="16" p="59.16597 92.96177">
+          <s font="3" size="10" face="96">O</s>
+        </t>
+      </n>
+      <n id="17" p="75.28574 67.88931" Element="6" />
+      <n id="18" p="75.73658 52.08519" Element="7" NumHydrogens="2">
+        <t id="19" p="73.97986 53.84191">
+          <s font="3" size="10" face="96">NH2</s>
+        </t>
+      </n>
+      <n id="20" p="88.74709 76.18181" Element="6" />
+      <n id="21" p="102.65928 68.67020" Element="6" />
+      <n id="22" p="88.29624 91.98593" Element="8" NumHydrogens="1">
+        <t id="23" p="86.53951 93.74266">
+          <s font="3" size="10" face="96">OH</s>
+        </t>
+      </n>
+      <b id="24" B="11" E="12" Order="1" />
+      <b id="25" B="12" E="14" Order="1" />
+      <b id="26" B="14" E="15" Order="2" />
+      <b id="27" B="14" E="17" Order="1" />
+      <b id="28" B="17" E="18" Order="1" Display="WedgeBegin" />
+      <b id="29" B="17" E="20" Order="1" />
+      <b id="30" B="20" E="21" Order="1" Display="WedgedHashBegin" />
+      <b id="31" B="20" E="22" Order="1" />
+    </fragment>
+    <fragment id="32">
+      <n id="33" p="505.00000 36.00000" Element="6" />
+      <n id="34" p="500.43582 51.13743" Element="8" NumHydrogens="0">
+        <t id="35" p="498.67909 52.89415">
+          <s font="3" size="10" face="96">O</s>
+        </t>
+      </n>
+      <n id="36" p="485.04433 54.75344" Element="6" />
+      <n id="37" p="474.21702 43.23203" Element="8" NumHydrogens="0">
+        <t id="38" p="472.46029 44.98876">
+          <s font="3" size="10" face="96">O</s>
+        </t>
+      </n>
+      <n id="39" p="480.48014 69.89086" Element="6" />
+      <n id="40" p="491.30745 81.41228" Element="7" NumHydrogens="1">
+        <t id="41" p="489.55072 83.16901">
+          <s font="3" size="10" face="96">NH</s>
+        </t>
+      </n>
+      <n id="42" p="486.74326 96.54971" Element="6" />
+      <n id="43" p="497.57057 108.07112" Element="6" />
+      <n id="44" p="471.35178 100.16572" Element="8" NumHydrogens="0">
+        <t id="45" p="469.59505 101.92245">
+          <s font="3" size="10" face="96">O</s>
+        </t>
+      </n>
+      <n id="46" p="465.08865 73.50688" Element="6" />
+      <n id="47" p="460.52447 88.64431" Element="6" />
+      <n id="48" p="454.26135 61.98547" Element="8" NumHydrogens="0">
+        <t id="49" p="452.50462 63.74219">
+          <s font="3" size="10" face="96">O</s>
+        </t>
+      </n>
+      <n id="50" p="438.86986 65.60148" Element="6" />
+      <n id="51" p="428.04256 54.08007" Element="6" />
+      <n id="52" p="434.30568 80.73891" Element="8" NumHydrogens="0">
+        <t id="53" p="432.54895 82.49564">
+          <s font="3" size="10" face="96">O</s>
+        </t>
+      </n>
+      <b id="54" B="33" E="34" Order="1" />
+      <b id="55" B="34" E="36" Order="1" />
+      <b id="56" B="36" E="37" Order="2" />
+      <b id="57" B="36" E="39" Order="1" />
+      <b id="58" B="39" E="40" Order="1" Display="WedgeBegin" />
+      <b id="59" B="40" E="42" Order="1" />
+      <b id="60" B="42" E="43" Order="1" />
+      <b id="61" B="42" E="44" Order="2" />
+      <b id="62" B="39" E="46" Order="1" />
+      <b id="63" B="46" E="47" Order="1" Display="WedgeBegin" />
+      <b id="64" B="46" E="48" Order="1" />
+      <b id="65" B="48" E="50" Order="1" />
+      <b id="66" B="50" E="51" Order="1" />
+      <b id="67" B="50" E="52" Order="2" />
+    </fragment>
+    <arrow id="68" Head3D="369.90125 72.03556 0" Tail3D="164.94967 72.03556 0" ArrowheadHead="Full" ArrowheadType="Solid" HeadSize="1000" FillType="None" BoundingBox="160.94967 68.03556 373.90125 76.03556" />
+    <t id="69" p="267.42546 51.54040" CaptionJustification="Center" Justification="Center" InterpretChemically="no">
+      <s font="3" size="10">SYNTHETIC FIXTURE</s>
+    </t>
+    <t id="70" p="267.42546 91.35957" CaptionJustification="Center" Justification="Center" InterpretChemically="no">
+      <s font="3" size="10">isolated</s>
+    </t>
+    <scheme id="71">
+      <step id="72" ReactionStepReactants="10" ReactionStepProducts="32" ReactionStepArrows="68" ReactionStepObjectsAboveArrow="69" ReactionStepObjectsBelowArrow="70" />
+    </scheme>
+  </page>
+</CDXML>

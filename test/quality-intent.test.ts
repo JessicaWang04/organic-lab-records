@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { fixtureDeliveryVerification } from "./delivery-fixture";
+import { fixtureDeliveryVerification, installFixtureInventory } from "./delivery-fixture";
 import { test } from "node:test";
 import { Chemistry } from "../src/chemistry";
 import { ExperimentStep, FileStore, Reagent, StepArtifacts } from "../src/domain";
@@ -43,9 +43,10 @@ function fixture(requestedChanges: string[]) {
   const state: SessionState = { id: "intent-test", dir: "Route", prompt: "fixture", status: "running",
     turns: 0, calls: 0, sources: [], context: [], rendered: {}, written: {}, receipts: {}, events: [], question: null,
     plan: { title: "source route", intent: "fixture", requestedChanges, steps: [step] } };
+  installFixtureInventory(state);
   let editCalls = 0;
   const chemistry: Chemistry = { call: async <T>(request: Record<string, unknown>) => {
-    if (request.op === "verify_delivery") return fixtureDeliveryVerification(request) as T;
+    if (["verify_delivery", "verify_compounds", "check_binding"].includes(String(request.op))) return fixtureDeliveryVerification(request) as T;
     if (request.op === "inspect") return { smiles: request.smiles } as T;
     if (request.op === "edit") {
       editCalls++;

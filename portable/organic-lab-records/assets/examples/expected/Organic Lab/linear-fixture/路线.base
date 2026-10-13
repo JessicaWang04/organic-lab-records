@@ -1,0 +1,49 @@
+filters:
+  and:
+    - file.ext == "md"
+    - note.type == "reaction-experiment"
+    - note.route_id == "linear-fixture"
+properties:
+  note.step_number:
+    displayName: 步骤
+  note.paper_step:
+    displayName: 文献步骤
+  note.attempt:
+    displayName: 尝试
+  note.status:
+    displayName: 状态
+  note.worked:
+    displayName: 是否跑通
+views:
+  - type: cards
+    name: 路线图库
+    image: note.image
+    imageAspectRatio: 0.4
+    imageFit: contain
+    cardSize: 350
+    order:
+      - file.name
+      - note.step_number
+      - note.attempt
+      - note.status
+      - note.worked
+    sort:
+      - property: note.step_number
+        direction: ASC
+      - property: note.attempt
+        direction: ASC
+  - type: table
+    name: 实验管理
+    order:
+      - file.name
+      - note.step_number
+      - note.paper_step
+      - note.attempt
+      - note.status
+      - note.worked
+      - note.measured_yield_percent
+    sort:
+      - property: note.step_number
+        direction: ASC
+      - property: note.attempt
+        direction: ASC

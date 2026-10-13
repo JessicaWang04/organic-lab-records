@@ -1,0 +1,56 @@
+<?xml version='1.0' encoding='utf-8'?>
+<CDXML BondLength="16.96333" LabelFont="3" LabelSize="10" LabelFace="96" CaptionFont="3" CaptionSize="10" CaptionFace="0" LineWidth="0.6" BondSpacing="18" InterpretChemically="no" PrintMargins="36 36 36 36" BoundingBox="24.00000 24.00000 514.99998 84.62483">
+  <fonttable>
+    <font id="3" name="Arial" charset="utf-8" />
+  </fonttable>
+  <page id="1" BoundingBox="0 0 540 720" WidthPages="1" HeightPages="1">
+    <fragment id="10">
+      <n id="11" p="34.00000 71.71200" Element="6" />
+      <n id="12" p="48.69068 63.23034" Element="6" />
+      <n id="13" p="48.69068 46.26700" Element="8" NumHydrogens="0">
+        <t id="14" p="46.80586 48.15182">
+          <s font="3" size="10" face="96">O</s>
+        </t>
+      </n>
+      <n id="15" p="63.38136 71.71200" Element="8" NumHydrogens="1">
+        <t id="16" p="61.49654 73.59682">
+          <s font="3" size="10" face="96">OH</s>
+        </t>
+      </n>
+      <b id="17" B="11" E="12" Order="1" />
+      <b id="18" B="12" E="13" Order="2" />
+      <b id="19" B="12" E="15" Order="1" />
+    </fragment>
+    <fragment id="20">
+      <n id="21" p="446.83076 64.29423" Element="6" />
+      <n id="22" p="462.57549 57.98088" Element="6" />
+      <n id="23" p="475.91537 68.45953" Element="8" NumHydrogens="0">
+        <t id="24" p="474.03056 70.34434">
+          <s font="3" size="10" face="96">O</s>
+        </t>
+      </n>
+      <n id="25" p="491.66009 62.14618" Element="6" />
+      <n id="26" p="504.99998 72.62483" Element="6" />
+      <n id="27" p="494.06493 45.35418" Element="8" NumHydrogens="0">
+        <t id="28" p="492.18012 47.23899">
+          <s font="3" size="10" face="96">O</s>
+        </t>
+      </n>
+      <b id="29" B="21" E="22" Order="1" />
+      <b id="30" B="22" E="23" Order="1" />
+      <b id="31" B="23" E="25" Order="1" />
+      <b id="32" B="25" E="26" Order="1" />
+      <b id="33" B="25" E="27" Order="2" />
+    </fragment>
+    <arrow id="34" Head3D="372.25055 58.98950 0" Tail3D="152.35549 58.98950 0" ArrowheadHead="Full" ArrowheadType="Solid" HeadSize="1000" FillType="None" BoundingBox="148.35549 54.98950 376.25055 62.98950" />
+    <t id="35" p="262.30302 37.00000" CaptionJustification="Center" Justification="Center" InterpretChemically="no">
+      <s font="3" size="10">SYNTHETIC FIXTURE</s>
+    </t>
+    <t id="36" p="262.30302 79.72247" CaptionJustification="Center" Justification="Center" InterpretChemically="no">
+      <s font="3" size="10">isolated</s>
+    </t>
+    <scheme id="37">
+      <step id="38" ReactionStepReactants="10" ReactionStepProducts="20" ReactionStepArrows="34" ReactionStepObjectsAboveArrow="35" ReactionStepObjectsBelowArrow="36" />
+    </scheme>
+  </page>
+</CDXML>

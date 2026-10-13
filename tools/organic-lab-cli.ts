@@ -5,6 +5,7 @@ import { promisify } from "node:util";
 import { PythonChemistry } from "../src/chemistry";
 import { LocalToolkit } from "./portable-toolkit";
 import { prepareObsidianVault } from "./prepare-obsidian-vault";
+import { guidance } from "./guidance";
 
 async function main(): Promise<void> {
   const [command, ...args] = process.argv.slice(2);
@@ -27,10 +28,19 @@ async function main(): Promise<void> {
     console.log(JSON.stringify({ status: "ready", dependencies, chemistry: check, modelRequests: 0 })); return;
   }
   if ([undefined, "help", "--help", "-h"].includes(command)) {
-    console.log("Organic Lab 本地工具（无模型 API）\n  doctor\n  prepare-vault --request vault.json\n  init --request init.json\n  call --request call.json\n  status --request status.json\n使用 UTF-8 JSON 文件传参；工作流和工具参数见 Skill 的 references/commands.md 与 tools.json。"); return;
+    console.log("Organic Lab 本地工具（无模型 API）\n  doctor\n  guide --request guide.json\n  contracts [--request names.json]\n  prepare-vault --request vault.json\n  init --request init.json\n  call --request call.json\n  status --request status.json\n宿主组织UTF-8 JSON；用户只给文献。工作流见manifest与核心层。"); return;
   }
-  if (!["init", "call", "status", "prepare-vault"].includes(command ?? "") || args.length !== 2 || args[0] !== "--request") throw new Error("command_invalid: 使用 prepare-vault|init|call|status --request <JSON文件>");
+  if (command === "contracts") {
+    const contracts = LocalToolkit.contracts() as { name: string }[];
+    if (!args.length) { console.log(JSON.stringify(contracts)); return; }
+    if (args.length !== 2 || args[0] !== "--request") throw new Error("command_invalid");
+    const requested: unknown = JSON.parse((await readFile(args[1], "utf8")).replace(/^\uFEFF/, ""));
+    if (!Array.isArray(requested) || !requested.length || requested.some(name => typeof name !== "string" || !contracts.some(tool => tool.name === name))) throw new Error("contracts_request_invalid: 提供工具名数组");
+    console.log(JSON.stringify(contracts.filter(tool => requested.includes(tool.name)))); return;
+  }
+  if (!["init", "call", "status", "prepare-vault", "guide"].includes(command ?? "") || args.length !== 2 || args[0] !== "--request") throw new Error("command_invalid: 使用 guide|prepare-vault|init|call|status --request <JSON文件>");
   const request: unknown = JSON.parse((await readFile(args[1], "utf8")).replace(/^\uFEFF/, ""));
+  if (command === "guide") { console.log(JSON.stringify(await guidance(join(base, ".."), request))); return; }
   if (command === "prepare-vault") {
     const interpreter = await promisify(execFile)(python, ["-B", "-X", "utf8", "-c", "import sys; print(sys.executable)"], { windowsHide: true, timeout: 15000 });
     const result = await prepareObsidianVault(request, { pluginDir: join(base, "..", "assets", "obsidian-plugin"), pythonPath: interpreter.stdout.trim() });

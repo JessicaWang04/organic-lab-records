@@ -1,0 +1,74 @@
+{
+  "case": "linear-fixture",
+  "synthetic": true,
+  "notAnOcrBenchmark": true,
+  "modelRequests": 0,
+  "delivery": {
+    "policy": "organic-lab-delivery/0.2.0",
+    "complete": true,
+    "requiredSteps": 3,
+    "verifiedReactionImages": 3,
+    "verifiedEditableCdxml": 3,
+    "verifiedRecords": 3,
+    "issues": []
+  },
+  "targets": [
+    "D"
+  ],
+  "expectedSteps": 3,
+  "expectedCompounds": 4,
+  "files": [
+    {
+      "path": "Organic Lab/linear-fixture/assets/S01-308b6656b6537f.png",
+      "bytes": 13045,
+      "sha256": "1b2378d40bdb730b1104b0ca59e280301be0725f9b75226c7c60c74b1e2b8aa8"
+    },
+    {
+      "path": "Organic Lab/linear-fixture/assets/S01-308b6656b6537f.cdxml",
+      "bytes": 2065,
+      "sha256": "220578926105ff45cfb203b7fbc74f671facb95ce2788a2a4f1d6d363dd2d0ca"
+    },
+    {
+      "path": "Organic Lab/linear-fixture/linear-fixture-01-R01-E1 synthetic fixture.md",
+      "bytes": 5959,
+      "sha256": "2944df1282734c91d3454725f29a5213fe2b2acfc4609797be9fd8afbc437194"
+    },
+    {
+      "path": "Organic Lab/linear-fixture/assets/S02-1bd03c0a85ce0c.png",
+      "bytes": 16803,
+      "sha256": "f98458c50ba14037c681c33167ab6d815253e38ebfc2f51adb7669b8118263b8"
+    },
+    {
+      "path": "Organic Lab/linear-fixture/assets/S02-1bd03c0a85ce0c.cdxml",
+      "bytes": 2294,
+      "sha256": "5018973604b6bce74602427248ca1a559f6032057605735d690b03c20f5749d7"
+    },
+    {
+      "path": "Organic Lab/linear-fixture/linear-fixture-02-R01-E2 synthetic fixture.md",
+      "bytes": 6063,
+      "sha256": "8cc20a974f9cc1eafe4fe076e81534ff62369000ea712d5891c70bd689643b5d"
+    },
+    {
+      "path": "Organic Lab/linear-fixture/assets/S03-e43cd66d3005da.png",
+      "bytes": 16388,
+      "sha256": "5df719c6cc4f438a2c5e22e5716513f924f6b640cc70cf61e8561f7127668d01"
+    },
+    {
+      "path": "Organic Lab/linear-fixture/assets/S03-e43cd66d3005da.cdxml",
+      "bytes": 2719,
+      "sha256": "619540be73d6a837df600d661b5a72e280f9dac70bad19d0cc94ce214c91d140"
+    },
+    {
+      "path": "Organic Lab/linear-fixture/linear-fixture-03-R01-E3 synthetic fixture.md",
+      "bytes": 6000,
+      "sha256": "66d01549f1620db888439430772287c736fdb222c93ce94ccb0358f003bdb5a6"
+    }
+  ],
+  "negativeChecks": [
+    "compound_formula_mismatch",
+    "missing_experiment",
+    "cached_finish_rejected_changed_png"
+  ],
+  "concurrency": 2,
+  "staticFormatting": "Final blank lines trimmed; native chemistry/files unchanged. Replay retains original generated notes."
+}

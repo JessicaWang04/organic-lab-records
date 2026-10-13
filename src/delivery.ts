@@ -3,10 +3,11 @@ import { ExperimentStep, FileStore, StepArtifacts } from "./domain";
 import { parseFrontmatter } from "./records";
 import { checkEvidence } from "./quality";
 import type { SessionState } from "./runner";
+import { expectedStep, inventoryIssues, verifyCompounds } from "./inventory";
 
 export interface DeliveryIssue { step: number; code: string; message: string }
 export interface DeliveryReport {
-  policy: "organic-lab-delivery/0.1.2"; complete: boolean; requiredSteps: number;
+  policy: "organic-lab-delivery/0.2.0"; complete: boolean; requiredSteps: number;
   verifiedReactionImages: number; verifiedEditableCdxml: number; verifiedRecords: number;
   issues: DeliveryIssue[];
 }
@@ -19,7 +20,7 @@ type NativeResult = { order: number; ok: boolean; error?: string; verification?:
 
 // Re-read actual bytes on every boundary. A quality.json flag or old receipt is never acceptance evidence.
 export async function auditDelivery(state: SessionState, store: FileStore, chemistry: Chemistry, steps = state.plan?.steps ?? [], requireRecords = true): Promise<DeliveryReport> {
-  const report: DeliveryReport = { policy: "organic-lab-delivery/0.1.2", complete: false, requiredSteps: steps.length,
+  const report: DeliveryReport = { policy: "organic-lab-delivery/0.2.0", complete: false, requiredSteps: steps.length,
     verifiedReactionImages: 0, verifiedEditableCdxml: 0, verifiedRecords: 0, issues: [] };
   const requests: Record<string, unknown>[] = [];
   const add = (step: number, error: unknown) => {
@@ -27,6 +28,12 @@ export async function auditDelivery(state: SessionState, store: FileStore, chemi
     report.issues.push({ step, code: message.split(":", 1)[0], message });
   };
   if (!steps.length) add(0, "plan_missing: 请先record_route");
+  if (requireRecords && steps === state.plan?.steps) {
+    report.issues.push(...inventoryIssues(state, steps, state.sources));
+    if (state.inventory && Object.keys(state.compounds ?? {}).length) {
+      try { await verifyCompounds(state, chemistry); } catch (error) { add(0, error); }
+    }
+  }
   for (const step of steps) {
     try {
       requireStructures(step);
@@ -39,7 +46,7 @@ export async function auditDelivery(state: SessionState, store: FileStore, chemi
       const errors = checkEvidence(step, state.sources).filter(issue => issue.severity === "error");
       if (errors.length) throw new Error(`evidence_invalid: ${JSON.stringify(errors)}`);
       requests.push({ order: step.order, reactants: step.reactants, products: step.products, aboveArrow: step.aboveArrow, belowArrow: step.belowArrow,
-        cdxml: await store.read(artifacts.cdxml), png: Buffer.from(await store.readBinary(artifacts.image)).toString("base64") });
+        cdxml: await store.read(artifacts.cdxml), png: Buffer.from(await store.readBinary(artifacts.image)).toString("base64"), ...expectedStep(state, step) });
       if (requireRecords) {
         const path = state.written[step.order];
         if (!path || !await store.exists(path)) throw new Error(`missing_step_records: ${step.order}，请write_step`);

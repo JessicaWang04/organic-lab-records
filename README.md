@@ -4,7 +4,7 @@
 
 An agent skill and local toolkit for evidence-linked organic synthesis records. The host model reads the sources; local tools calculate, validate and write artifacts.
 
-**当前版本：0.1.2 测试版。** 结构识别依赖宿主模型，复杂立体结构和完整文献的跨模型准确率尚未完成基准测试。每一步必须通过紧裁剪反应 PNG、原生可编辑 CDXML 和笔记链接验收；缺少结构时保留进度并继续修复，不能标为完成。来源图识别准确率仍需独立评测。
+**当前版本：0.2.0 测试版。** 结构识别依赖宿主模型，复杂立体结构和完整文献的跨模型准确率尚未完成基准测试。每一步必须通过紧裁剪反应 PNG、原生可编辑 CDXML 和笔记链接验收；缺少结构时保留进度并继续修复，不能标为完成。来源图识别准确率仍需独立评测。
 
 ## 三步开始
 
@@ -26,7 +26,15 @@ Codex 用户双击 `setup-codex.cmd`，通过 `$organic-lab-records` 加链接�
 
 默认使用已确认的 Obsidian 项目或本机个人默认库，否则在当前目录建立 `Organic Lab Records`。分发包不含作者的笔记、论文文件、密钥、默认库路径或运行时配置。
 
-`SKILL.md` 是入口；化学记录口径见 [workflow.md](portable/organic-lab-records/references/workflow.md)，本地命令见 [commands.md](portable/organic-lab-records/references/commands.md)，参数合同见 [tools.json](portable/organic-lab-records/references/tools.json)。
+`SKILL.md` 是分层入口，manifest规定始终加载的核心、来源类型和问题专题；化学记录口径见 [workflow.md](portable/organic-lab-records/references/workflow.md)，本地命令见 [commands.md](portable/organic-lab-records/references/commands.md)，参数合同见 [tools.json](portable/organic-lab-records/references/tools.json)。
+
+## 分层流程与提速
+
+来源清单先于生成计划；化合物核对登记后复用，计划与实验/物料绑定，写入前预检，最后验真实文件。门禁检查漏步、重复、结构漂移、式/盐/明确立体、差向异构关系、MW和笔记链接，无法用“尚待确认”或假标记完成。
+
+`guide`一次读取必要层，`contracts`筛选当前schema；PDF/候选解析批量复用Python，文件生成最多2步并行，部分失败只修失败项。普通用户仍使用`/lab <新文献>`，不增加提示词负担。
+
+[完整可重放示例](portable/organic-lab-records/references/worked-examples.md)包含直线和立体分支/粗品/one-pot案例、真实PNG/CDXML/笔记及失败门禁。案例为合成测试材料，另需真实SI识别评测。[快速识别方案](portable/organic-lab-records/references/recognition.md)说明可选开源定位/分子图候选接口；本版不捆绑外部识别权重。
 
 ## 开发与验证
 

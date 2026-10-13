@@ -1,0 +1,204 @@
+{
+  "compounds": [
+    {
+      "id": "A",
+      "label": "A two-center starting material",
+      "origin": "starting",
+      "sourceImage": {
+        "sourceId": "si",
+        "page": 1,
+        "bbox": [
+          0.05,
+          0.065,
+          0.95,
+          0.375
+        ]
+      },
+      "citations": [
+        {
+          "sourceId": "si",
+          "page": 1,
+          "quote": "Synthetic compound A: formula C4H9NO3; specified centers 2; specified double bonds 0; components 1."
+        }
+      ],
+      "formula": {
+        "formula": "C4H9NO3",
+        "adduct": null,
+        "mz": null
+      },
+      "stereo": {
+        "scope": "specified",
+        "centers": 2,
+        "doubleBonds": 0
+      },
+      "components": 1,
+      "isomerOf": null,
+      "relationship": null
+    },
+    {
+      "id": "B",
+      "label": "B shared crude intermediate",
+      "origin": "intermediate",
+      "sourceImage": {
+        "sourceId": "si",
+        "page": 2,
+        "bbox": [
+          0.05,
+          0.065,
+          0.95,
+          0.375
+        ]
+      },
+      "citations": [
+        {
+          "sourceId": "si",
+          "page": 2,
+          "quote": "Synthetic compound B: formula C5H11NO3; specified centers 2; specified double bonds 0; components 1."
+        }
+      ],
+      "formula": {
+        "formula": "C5H11NO3",
+        "adduct": null,
+        "mz": null
+      },
+      "stereo": {
+        "scope": "specified",
+        "centers": 2,
+        "doubleBonds": 0
+      },
+      "components": 1,
+      "isomerOf": null,
+      "relationship": null
+    },
+    {
+      "id": "P0",
+      "label": "P0 target",
+      "origin": "target",
+      "sourceImage": {
+        "sourceId": "si",
+        "page": 3,
+        "bbox": [
+          0.05,
+          0.065,
+          0.95,
+          0.375
+        ]
+      },
+      "citations": [
+        {
+          "sourceId": "si",
+          "page": 3,
+          "quote": "Synthetic compound P0: formula C9H15NO5; specified centers 2; specified double bonds 0; components 1."
+        }
+      ],
+      "formula": {
+        "formula": "C9H15NO5",
+        "adduct": null,
+        "mz": null
+      },
+      "stereo": {
+        "scope": "specified",
+        "centers": 2,
+        "doubleBonds": 0
+      },
+      "components": 1,
+      "isomerOf": null,
+      "relationship": null
+    },
+    {
+      "id": "P1",
+      "label": "P1 epimer target",
+      "origin": "target",
+      "sourceImage": {
+        "sourceId": "si",
+        "page": 4,
+        "bbox": [
+          0.05,
+          0.065,
+          0.95,
+          0.375
+        ]
+      },
+      "citations": [
+        {
+          "sourceId": "si",
+          "page": 4,
+          "quote": "Synthetic compound P1: formula C9H15NO5; specified centers 2; specified double bonds 0; components 1. P1 is an epimer of P0; exactly one of two centers is inverted."
+        }
+      ],
+      "formula": {
+        "formula": "C9H15NO5",
+        "adduct": null,
+        "mz": null
+      },
+      "stereo": {
+        "scope": "specified",
+        "centers": 2,
+        "doubleBonds": 0
+      },
+      "components": 1,
+      "isomerOf": "P0",
+      "relationship": "epimer"
+    }
+  ],
+  "experiments": [
+    {
+      "id": "E1",
+      "paperStep": "E1",
+      "reactants": [
+        "A"
+      ],
+      "products": [
+        "B"
+      ],
+      "handling": "crude-transfer",
+      "citations": [
+        {
+          "sourceId": "si",
+          "page": 5,
+          "quote": "Synthetic experiment E1: A to B; handling crude-transfer; 1 simulated stage(s). Reference basis 1.00 mmol is synthetic. No experimental conditions or measured yields are supplied."
+        }
+      ]
+    },
+    {
+      "id": "E2",
+      "paperStep": "E2",
+      "reactants": [
+        "B"
+      ],
+      "products": [
+        "P0"
+      ],
+      "handling": "one-pot",
+      "citations": [
+        {
+          "sourceId": "si",
+          "page": 6,
+          "quote": "Synthetic experiment E2: B to P0; handling one-pot; 2 simulated stage(s). Reference basis 1.00 mmol is synthetic. No experimental conditions or measured yields are supplied."
+        }
+      ]
+    },
+    {
+      "id": "E3",
+      "paperStep": "E3",
+      "reactants": [
+        "B"
+      ],
+      "products": [
+        "P1"
+      ],
+      "handling": "isolated",
+      "citations": [
+        {
+          "sourceId": "si",
+          "page": 7,
+          "quote": "Synthetic experiment E3: B to P1; handling isolated; 1 simulated stage(s). Reference basis 1.00 mmol is synthetic. No experimental conditions or measured yields are supplied."
+        }
+      ]
+    }
+  ],
+  "targets": [
+    "P0",
+    "P1"
+  ]
+}
