@@ -1,0 +1,679 @@
+[
+  {
+    "type": "function",
+    "name": "search_sources",
+    "description": "检索本次全部正文和SI的文本索引。返回来源ID、页码和原文；先按化合物编号或试剂检索，再阅读具体页面，不上传整个SI的全部图谱。",
+    "strict": true,
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "query",
+        "limit"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "type": "function",
+    "name": "read_source_page",
+    "description": "读取已上传来源的具体页面，返回页面文字和真实图像供视觉核对；bbox可指定0到1的[x0,y0,x1,y1]裁剪，null为整页。",
+    "strict": true,
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "sourceId": {
+          "type": "string"
+        },
+        "page": {
+          "type": "integer"
+        },
+        "bbox": {
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "sourceId",
+        "page",
+        "bbox"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "type": "function",
+    "name": "record_route",
+    "description": "记录原图/文献观察、用户目的和有序实验步骤。所有未知值用null/空数组。结构先记录原始观察，用户修改走edit_structure。缺少可核对SMILES可留空结构数组，并指定sourceImage。任何文献当量必须有引用；已有实验已写入后不能覆盖计划。",
+    "strict": true,
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "plan": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string"
+            },
+            "intent": {
+              "type": "string"
+            },
+            "requestedChanges": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "steps": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "order": {
+                    "type": "integer"
+                  },
+                  "paperStep": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "purpose": {
+                    "type": "string"
+                  },
+                  "reactants": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "products": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "reagents": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "role": {
+                          "type": "string",
+                          "enum": [
+                            "substrate",
+                            "reagent",
+                            "catalyst",
+                            "solvent",
+                            "product"
+                          ]
+                        },
+                        "smiles": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "mw": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "equivalents": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "referenceAmountMmol": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "referenceMassMg": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "referenceVolumeMl": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "concentrationM": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "densityGml": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "purityPercent": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "citations": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "sourceId": {
+                                "type": "string"
+                              },
+                              "page": {
+                                "type": "integer"
+                              },
+                              "quote": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "sourceId",
+                              "page",
+                              "quote"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "formula": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "physicalState": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "enum": [
+                            "solid",
+                            "liquid",
+                            "solution",
+                            "gas",
+                            null
+                          ]
+                        },
+                        "propertySources": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "property": {
+                                "type": "string",
+                                "enum": [
+                                  "formula",
+                                  "mw",
+                                  "physicalState",
+                                  "densityGml",
+                                  "concentrationM",
+                                  "purityPercent",
+                                  "equivalents"
+                                ]
+                              },
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "structure",
+                                  "literature",
+                                  "catalog",
+                                  "user"
+                                ]
+                              },
+                              "reference": {
+                                "type": "string"
+                              },
+                              "citation": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "sourceId": {
+                                        "type": "string"
+                                      },
+                                      "page": {
+                                        "type": "integer"
+                                      },
+                                      "quote": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "sourceId",
+                                      "page",
+                                      "quote"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "url": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "temperatureC": {
+                                "type": [
+                                  "number",
+                                  "null"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "property",
+                              "kind",
+                              "reference",
+                              "citation",
+                              "url",
+                              "temperatureC"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name",
+                        "role",
+                        "smiles",
+                        "mw",
+                        "equivalents",
+                        "referenceAmountMmol",
+                        "referenceMassMg",
+                        "referenceVolumeMl",
+                        "concentrationM",
+                        "densityGml",
+                        "purityPercent",
+                        "citations",
+                        "formula",
+                        "physicalState",
+                        "propertySources"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "aboveArrow": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "belowArrow": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "procedure": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "workup": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "purification": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "characterization": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "citations": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "sourceId": {
+                          "type": "string"
+                        },
+                        "page": {
+                          "type": "integer"
+                        },
+                        "quote": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "sourceId",
+                        "page",
+                        "quote"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "referenceBasisMmol": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "referenceYield": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "yieldScope": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "conflicts": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "sourceImage": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "sourceId": {
+                            "type": "string"
+                          },
+                          "page": {
+                            "type": "integer"
+                          },
+                          "bbox": {
+                            "anyOf": [
+                              {
+                                "type": "array",
+                                "items": {
+                                  "type": "number"
+                                }
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "sourceId",
+                          "page",
+                          "bbox"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "scaleMmol": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "scaleBasisId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "order",
+                  "paperStep",
+                  "title",
+                  "purpose",
+                  "reactants",
+                  "products",
+                  "reagents",
+                  "aboveArrow",
+                  "belowArrow",
+                  "procedure",
+                  "workup",
+                  "purification",
+                  "characterization",
+                  "citations",
+                  "referenceBasisMmol",
+                  "referenceYield",
+                  "yieldScope",
+                  "conflicts",
+                  "sourceImage",
+                  "scaleMmol",
+                  "scaleBasisId"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "title",
+            "intent",
+            "requestedChanges",
+            "steps"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "plan"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "type": "function",
+    "name": "inspect_structure",
+    "description": "RDKit解析本次候选结构，返回平均摩尔质量、分子式、原子索引、邻接和CIP。此调用只验证分子图，不证明原图识别正确。",
+    "strict": true,
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "smiles": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "smiles"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "type": "function",
+    "name": "lookup_reagent",
+    "description": "补全某一步物料的可核对性质：SMILES平均MW、本次PDF同编号化合物的HRMS分子式核对、常温形态、已核对常用试剂目录密度。只填空缺并附来源；不猜复杂底物密度、配方或EDCI盐型。",
+    "strict": true,
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "step": {
+          "type": "integer"
+        },
+        "reagentId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "step",
+        "reagentId"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "type": "function",
+    "name": "edit_structure",
+    "description": "在已记录路线的某一步指定试剂/底物上执行本地编辑，返回权威before/after。add_para_methoxy按唯一卤素及芳环定位；add_group需要inspect返回的atomIndex；replace_atom指定element。其余字段填null。后续不同结构需要分别核对调用，不自动预测反应。",
+    "strict": true,
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "step": {
+          "type": "integer"
+        },
+        "reagentId": {
+          "type": "string"
+        },
+        "operation": {
+          "type": "string",
+          "enum": [
+            "add_para_methoxy",
+            "add_group",
+            "replace_atom"
+          ]
+        },
+        "anchorElement": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "atomIndex": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "group": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "element": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "step",
+        "reagentId",
+        "operation",
+        "anchorElement",
+        "atomIndex",
+        "group",
+        "element"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "type": "function",
+    "name": "set_scale",
+    "description": "将用户明确的mmol绑定本步具体底物。仅操作指定步，不使用文献产率推算后续投料；修改后图会重新计算MW。",
+    "strict": true,
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "step": {
+          "type": "integer"
+        },
+        "reagentId": {
+          "type": "string"
+        },
+        "amountMmol": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "step",
+        "reagentId",
+        "amountMmol"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "type": "function",
+    "name": "render_step",
+    "description": "真实生成某步反应图片和可编辑CDXML，校验图结构与立体读回。结构未知时仅裁剪sourceImage并标待核对，CDXML为null。返回真实文件引用、MW和质量报告。",
+    "strict": true,
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "step": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "step"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "type": "function",
+    "name": "write_step",
+    "description": "保存已经绘图的单步实验草稿Markdown，包含正文/YAML图片、CDXML链接、计量、参考procedure、留空实际现象与表征区。引用硬错误不能保存。同一已创建步骤返回已有路径，不重复创建。",
+    "strict": true,
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "step": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "step"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "type": "function",
+    "name": "finish_route",
+    "description": "检查各步骤已生成、图片与图谱链接、文件顺序和质量产物，保存路线主页、Bases图库和真实Log；全部检查成功才结束。",
+    "strict": true,
+    "parameters": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    }
+  }
+]

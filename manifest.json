@@ -1,0 +1,9 @@
+{
+  "id": "organic-lab-agent",
+  "name": "Organic Lab Agent",
+  "version": "0.1.0",
+  "minAppVersion": "1.11.4",
+  "description": "从截图或文献生成逐步骤实验记录、反应图库、CDXML 和可计算计量表。",
+  "author": "Organic Lab",
+  "isDesktopOnly": true
+}

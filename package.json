@@ -1,0 +1,27 @@
+{
+  "name": "organic-lab-agent",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Obsidian organic chemistry route and experiment workbench",
+  "scripts": {
+    "build": "tsc --noEmit && node esbuild.config.mjs",
+    "dev": "node esbuild.config.mjs --watch",
+    "test": "tsx --test test/*.test.ts",
+    "build-skill": "npm run build && node tools/build-portable-skill.mjs --windows-runtime",
+    "package-skill": "python tools/package-portable-skill.py",
+    "check-workbench-budget": "node tools/validation/budget/verify.cjs",
+    "test:python": "python -m unittest discover -s test -p test_chemistry_worker.py"
+  },
+  "dependencies": {
+    "ajv": "^8.20.0",
+    "yaml": "^2.8.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "esbuild": "^0.25.0",
+    "obsidian": "latest",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0"
+  },
+  "license": "AGPL-3.0-only"
+}

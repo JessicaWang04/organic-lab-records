@@ -1,0 +1,4 @@
+interface:
+  display_name: "有机合成实验记录"
+  short_description: "从截图和论文整理有来源的逐步实验草稿、CDXML 与完整 Obsidian 记录库"
+  default_prompt: "使用 $organic-lab-records 整理我提供的新论文链接、DOI 或附件，按默认设置生成完整逐步实验记录和 Obsidian 记录库。"

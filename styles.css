@@ -1,0 +1,29 @@
+.olab-workbench { max-width: 1160px; margin: 0 auto; padding: 28px !important; }
+.olab-workbench h2 { margin: 0 0 12px; font-size: 27px; }
+.olab-muted { color: var(--text-muted); line-height: 1.7; }
+.olab-input { padding: 22px; background: var(--background-secondary); border: 1px solid var(--background-modifier-border); border-radius: 8px; }
+.olab-input textarea, .olab-output textarea { display: block; width: 100%; resize: vertical; margin: 18px 0; line-height: 1.7; }
+.olab-attachments { white-space: pre-wrap; line-height: 1.8; margin-top: 12px; font-size: 13px; color: var(--text-muted); }
+.olab-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.olab-output { margin: 24px 0; }
+.olab-output button { margin-right: 10px; margin-bottom: 10px; }
+.olab-log { border-top: 1px solid var(--background-modifier-border); padding-top: 16px; font-family: var(--font-monospace); font-size: 12px; line-height: 2; max-height: 350px; overflow: auto; }
+.olab-stoich { padding: 4px 0 12px; font-size: var(--font-small); }
+.olab-scale-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.olab-scale-controls label { display: flex; align-items: center; gap: 10px; }
+.olab-scale-controls input { width: 110px; }
+.olab-table-scroll { overflow-x: auto; margin: 12px 0; }
+.olab-stoich table { width: 100%; border-collapse: collapse; }
+.olab-stoich th, .olab-stoich td { padding: 6px 5px; border-bottom: 1px solid var(--background-modifier-border); white-space: nowrap; }
+.olab-stoich td input { width: 76px; max-width: 100%; font-variant-numeric: tabular-nums; }
+.olab-stoich td select { max-width: 90px; }
+.olab-stoich td small { display: block; font-size: 11px; color: var(--text-muted); }
+.olab-stoich .olab-component { white-space: normal; min-width: 95px; }
+.olab-result-preview td:not(:first-child) { text-align: right; font-variant-numeric: tabular-nums; }
+.olab-calculation-hint { margin: 10px 0; font-size: 12px; color: var(--text-muted); line-height: 1.5; }
+.olab-property-details { margin: 12px 0; color: var(--text-muted); }
+.olab-property-details summary { cursor: pointer; }
+.olab-property-source { padding: 10px 0; border-bottom: 1px solid var(--background-modifier-border); }
+.olab-property-source p { margin: 4px 0; font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+.olab-reaction-image { display: block; width: 100%; }
+.olab-reaction-image img { display: block; max-height: 220px; width: auto; max-width: 100%; margin: 0 auto; object-fit: contain; }
