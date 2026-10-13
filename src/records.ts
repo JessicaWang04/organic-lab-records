@@ -60,6 +60,7 @@ function stoichSection(input: StoichInput): string {
 }
 const list = (values: string[], numbered = false) => values.length ? values.map((v, i) => `${numbered ? `${i + 1}.` : "-"} ${v}`).join("\n") : "原文未给出，待补充。";
 export function buildStepNote(routeId: string, step: ExperimentStep, artifacts: StepArtifacts, sources: SourceAsset[], previous: string | null, next: string | null): string {
+  if (!artifacts.cdxml) throw new Error("editable_artifacts_missing: 实验记录必须链接可编辑CDXML");
   const link = (path: string | null) => path ? `[[${safePath(path)}]]` : null;
   const sourceLinks = [...new Set(step.citations.map(c => {
     const source = sources.find(s => s.id === c.sourceId);
@@ -68,16 +69,16 @@ export function buildStepNote(routeId: string, step: ExperimentStep, artifacts: 
   const frontmatter = {
     type: "reaction-experiment", route_id: routeId, step_number: step.order, paper_step: step.paperStep,
     attempt: 1, attempts_count: 0, status: "draft", worked: null,
-    image: link(artifacts.image), cdxml: link(artifacts.cdxml), structure_status: artifacts.cdxml ? "graph-validated-needs-image-review" : "source-image-only",
+    image: link(artifacts.image), cdxml: link(artifacts.cdxml), structure_status: "graph-validated-source-review-required",
     quality: link(artifacts.quality), scale_mmol: step.scaleMmol, scale_basis: step.scaleBasisId,
     previous_step: link(previous), next_step: link(next), sources: sourceLinks,
     reference_yield: step.referenceYield, reference_yield_scope: step.yieldScope,
-    measured_yield_percent: null, spectra: [], skill_version: "experiment-records/1.0.0", harness_version: "organic-lab/0.1.0"
+    measured_yield_percent: null, spectra: [], skill_version: "experiment-records/1.0.1", harness_version: "organic-lab/0.1.2"
   };
   const referenceSpectra = artifacts.referenceSpectra ?? [];
   Object.assign(frontmatter, { reference_spectra: referenceSpectra.map(path => link(path)) });
   const stoich = { scaleMmol: step.scaleMmol, basisId: step.scaleBasisId, rows: step.reagents };
-  return `---\n${stringify(frontmatter)}---\n\n# ${step.title}\n\n## 实验目的\n\n${step.purpose}\n\n## 反应式\n\n![[${artifacts.image}]]\n\n可编辑结构：${link(artifacts.cdxml) ?? "结构尚待确认；当前显示原文图像。"}\n\n参考条件：${[...step.aboveArrow, ...step.belowArrow].join("；")}\n\n${stoichSection(stoich)}\n\n## 文献参考步骤\n\n${list(step.procedure, true)}\n\n## 实际操作与现象记录\n\n| 时间 | 操作／观察 | TLC／取样 | 附件 |\n|---|---|---|---|\n| | | | |\n\n## 后处理\n\n### 文献参考\n${list(step.workup, true)}\n\n### 实际记录\n\n\n## 纯化\n\n### 文献参考\n${list(step.purification)}\n\n### 实际记录\n\n\n## 表征与图谱\n\n### 文献参考\n${list(step.characterization)}\n\n### 本次实验\n\n将本次 NMR、LCMS、HRMS、IR 或原始数据拖入此处，并在 YAML 的 spectra 中登记。\n\n## 结果\n\n- 本次产物质量：\n- 本次实测产率：\n- 本次是否跑通：\n- 备注：\n\n文献产率：${step.referenceYield ?? "未知"}；口径：${step.yieldScope ?? "未知"}。本次实验结果单独记录。\n\n## 来源与核对\n\n${step.citations.map(c => {
+  return `---\n${stringify(frontmatter)}---\n\n# ${step.title}\n\n## 实验目的\n\n${step.purpose}\n\n## 反应式\n\n![[${artifacts.image}]]\n\n可编辑结构：${link(artifacts.cdxml)}\n\n参考条件：${[...step.aboveArrow, ...step.belowArrow].join("；")}\n\n${stoichSection(stoich)}\n\n## 文献参考步骤\n\n${list(step.procedure, true)}\n\n## 实际操作与现象记录\n\n| 时间 | 操作／观察 | TLC／取样 | 附件 |\n|---|---|---|---|\n| | | | |\n\n## 后处理\n\n### 文献参考\n${list(step.workup, true)}\n\n### 实际记录\n\n\n## 纯化\n\n### 文献参考\n${list(step.purification)}\n\n### 实际记录\n\n\n## 表征与图谱\n\n### 文献参考\n${list(step.characterization)}\n\n### 本次实验\n\n将本次 NMR、LCMS、HRMS、IR 或原始数据拖入此处，并在 YAML 的 spectra 中登记。\n\n## 结果\n\n- 本次产物质量：\n- 本次实测产率：\n- 本次是否跑通：\n- 备注：\n\n文献产率：${step.referenceYield ?? "未知"}；口径：${step.yieldScope ?? "未知"}。本次实验结果单独记录。\n\n## 来源与核对\n\n${step.citations.map(c => {
     const s = sources.find(source => source.id === c.sourceId);
     return `- ${s ? `[[${s.path}#page=${c.page}|${s.name} · p${c.page}]]` : `${c.sourceId}:p${c.page}`}\n  > ${c.quote.replace(/\n/g, "\n  > ")}`;
   }).join("\n\n")}\n\n${list(step.conflicts)}\n\n质量报告：[[${artifacts.quality}]]\n\n## 文献参考图谱附件\n\n${referenceSpectra.map(path => `![[${path}]]`).join("\n\n")}\n`;

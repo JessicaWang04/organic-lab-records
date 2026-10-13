@@ -1,4 +1,6 @@
 import base64
+import copy
+import hashlib
 import io
 import json
 import math
@@ -11,7 +13,7 @@ from collections import Counter
 from functools import lru_cache
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageChops, ImageDraw, ImageFont
 from rdkit import Chem, RDLogger
 from rdkit.Chem import AllChem, Descriptors, Draw, rdMolDescriptors, rdFMCS
 
@@ -273,36 +275,95 @@ def fit_cdxml_canvas(root):
             "widthPages": columns, "heightPages": rows, "coordinateScale": scale, "captionInterpretation": "disabled"}
 
 
+def reaction_layout(request):
+    font = ImageFont.load_default(size=20)
+    for candidate in (Path(os.environ.get("WINDIR", "C:/Windows")) / "Fonts/msyh.ttc", Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")):
+        if candidate.is_file():
+            font = ImageFont.truetype(str(candidate), 20)
+            break
+
+    def lines(values):
+        output = []
+        for value in values:
+            if not isinstance(value, str) or len(value) > 2000:
+                raise ValueError("conditions_invalid: 条件文字必须为不超过2000字的字符串")
+            for line in value.splitlines() or [""]:
+                current = ""
+                for character in line:
+                    if current and font.getlength(current + character) > 560:
+                        output.append(current.strip())
+                        current = ""
+                    current += character
+                output.append(current.strip())
+        if len(output) > 24:
+            raise ValueError("conditions_too_long: 请将实验操作放入procedure，仅在箭头处保留反应条件")
+        return output
+
+    above, below = lines(request.get("aboveArrow", [])), lines(request.get("belowArrow", []))
+    gap = max(350, math.ceil(max((font.getlength(line) for line in above + below), default=0)) + 40)
+    center = max(170, 70 + len(above) * 27)
+    height = center + max(170, 70 + len(below) * 27)
+    return font, above, below, gap, center, height
+
+
+def reaction_png(request, reactants, products):
+    font, above, below, gap, center, height = reaction_layout(request)
+    width = (len(reactants) + len(products)) * 330 + gap
+    image = Image.new("RGB", (width, height), "white")
+    draw = ImageDraw.Draw(image)
+    for i, mol in enumerate(reactants + products):
+        x = 165 + i * 330 + (gap if i >= len(reactants) else 0)
+        tile = Draw.MolToImage(mol, size=(310, 280))
+        image.paste(tile.convert("RGB"), (int(x - 155), center - 140))
+    tail, head = len(reactants) * 330, len(reactants) * 330 + gap
+    draw.line((tail, center, head, center), fill="black", width=3)
+    draw.polygon(((head, center), (head - 12, center - 6), (head - 12, center + 6)), fill="black")
+    for i, value in enumerate(above):
+        draw.text(((tail + head) / 2, center - 35 - (len(above) - 1 - i) * 27), value, font=font, anchor="mm", fill="black")
+    for i, value in enumerate(below):
+        draw.text(((tail + head) / 2, center + 33 + i * 27), value, font=font, anchor="mm", fill="black")
+    ink = ImageChops.difference(image, Image.new("RGB", image.size, "white")).getbbox()
+    if not ink:
+        raise ValueError("reaction_image_empty")
+    # Crop to the actual reaction, keeping 20 px of padding on each edge.
+    image = image.crop(ink)
+    padded = Image.new("RGB", (image.width + 40, image.height + 40), "white")
+    padded.paste(image, (20, 20))
+    png = io.BytesIO()
+    padded.save(png, "PNG")
+    return png.getvalue(), {"kind": "single-reaction", "width": padded.width, "height": padded.height,
+                            "paddingPx": 20, "inkBounds": [20, 20, padded.width - 20, padded.height - 20]}
+
+
 def render_step(request):
     reactants = [molecule(s) for s in request["reactants"]]
     products = [molecule(s) for s in request["products"]]
     if not reactants or not products or len(reactants) + len(products) > 12:
         raise ValueError("structure_missing: 需要明确的反应物与产物，不能从名称猜结构")
-    above = request.get("aboveArrow", [])
-    below = request.get("belowArrow", [])
-    width = max(1200, (len(reactants) + len(products)) * 330 + 350)
+    _, above, below, gap, center, height = reaction_layout(request)
+    width = (len(reactants) + len(products)) * 330 + gap
     root = ET.Element("CDXML", BondLength="18", LabelFont="3", LabelSize="10", LabelFace="96", CaptionFont="3", CaptionSize="10",
                       CaptionFace="0", LineWidth="0.6", BondSpacing="18", InterpretChemically="no", PrintMargins="36 36 36 36")
     table = ET.SubElement(root, "fonttable")
     ET.SubElement(table, "font", id="3", name="Arial", charset="utf-8")
-    page = ET.SubElement(root, "page", id="1", BoundingBox=f"0 0 {width} 460")
+    page = ET.SubElement(root, "page", id="1", BoundingBox=f"0 0 {width} {height}")
     ids, uid, xs = [], 10, []
     for i, mol in enumerate(reactants + products):
-        x = 165 + i * 330 + (350 if i >= len(reactants) else 0)
-        fid, uid = fragment(page, mol, uid, x, 220)
+        x = 165 + i * 330 + (gap if i >= len(reactants) else 0)
+        fid, uid = fragment(page, mol, uid, x, center)
         ids.append(fid)
         xs.append(x)
     tail = len(reactants) * 330
-    head = tail + 350
+    head = tail + gap
     arrow = uid
-    ET.SubElement(page, "arrow", id=str(uid), Head3D=f"{head} 220 0", Tail3D=f"{tail} 220 0", ArrowheadHead="Full", ArrowheadType="Solid", HeadSize="1000", FillType="None")
+    ET.SubElement(page, "arrow", id=str(uid), Head3D=f"{head} {center} 0", Tail3D=f"{tail} {center} 0", ArrowheadHead="Full", ArrowheadType="Solid", HeadSize="1000", FillType="None")
     uid += 1
     tops, bottoms = [], []
     for i, value in enumerate(above):
-        tops.append(text(page, uid, (tail + head) / 2, 190 - (len(above) - 1 - i) * 20, value))
+        tops.append(text(page, uid, (tail + head) / 2, center - 35 - (len(above) - 1 - i) * 27, value))
         uid += 1
     for i, value in enumerate(below):
-        bottoms.append(text(page, uid, (tail + head) / 2, 253 + i * 20, value))
+        bottoms.append(text(page, uid, (tail + head) / 2, center + 33 + i * 27, value))
         uid += 1
     scheme = ET.SubElement(page, "scheme", id=str(uid))
     ET.SubElement(scheme, "step", id=str(uid + 1), ReactionStepReactants=" ".join(map(str, ids[:len(reactants)])), ReactionStepProducts=" ".join(map(str, ids[len(reactants):])), ReactionStepArrows=str(arrow), ReactionStepObjectsAboveArrow=" ".join(map(str, tops)), ReactionStepObjectsBelowArrow=" ".join(map(str, bottoms)))
@@ -312,26 +373,83 @@ def render_step(request):
     parsed = Chem.MolsFromCDXML(cdxml)
     if Counter(map(identity, parsed)) != Counter(map(identity, reactants + products)):
         raise ValueError("cdxml_roundtrip_failed: 导出改变了结构或立体化学")
-    image = Image.new("RGB", (width, 460), "white")
-    draw = ImageDraw.Draw(image)
-    font = ImageFont.load_default(size=20)
-    for candidate in (Path(os.environ.get("WINDIR", "C:/Windows")) / "Fonts/msyh.ttc", Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")):
-        if candidate.is_file():
-            font = ImageFont.truetype(str(candidate), 20)
-            break
-    for mol, x in zip(reactants + products, xs):
-        tile = Draw.MolToImage(mol, size=(310, 280))
-        image.paste(tile.convert("RGB"), (int(x - 155), 80))
-    draw.line((tail, 220, head, 220), fill="black", width=3)
-    draw.polygon(((head, 220), (head - 12, 214), (head - 12, 226)), fill="black")
-    for i, value in enumerate(above):
-        draw.text(((tail + head) / 2, 185 - (len(above) - 1 - i) * 27), value, font=font, anchor="mm", fill="black")
-    for i, value in enumerate(below):
-        draw.text(((tail + head) / 2, 253 + i * 27), value, font=font, anchor="mm", fill="black")
-    png = io.BytesIO()
-    image.save(png, "PNG")
-    return {"cdxml": cdxml, "png": base64.b64encode(png.getvalue()).decode(), "properties": [inspect(identity(m)) for m in reactants + products],
-            "quality": {"graphRoundtrip": "passed", "imageFidelity": "needsReview", "stereoRoundtrip": "passed", "cdxmlLayout": layout}}
+    png, image_layout = reaction_png(request, reactants, products)
+    return {"cdxml": cdxml, "png": base64.b64encode(png).decode(), "properties": [inspect(identity(m)) for m in reactants + products],
+            "quality": {"graphRoundtrip": "passed", "sourceImageFidelity": "not-machine-verified", "stereoRoundtrip": "passed", "cdxmlLayout": layout,
+                        "reactionImage": image_layout}}
+
+
+def verify_step_artifacts(request):
+    expected = [molecule(s) for s in request["reactants"] + request["products"]]
+    if not request["reactants"] or not request["products"] or len(expected) > 12:
+        raise ValueError("structure_missing: 每一步必须有反应物和产物结构")
+    cdxml = request["cdxml"]
+    if not isinstance(cdxml, str) or len(cdxml) > 5_000_000 or "<!" in cdxml:
+        raise ValueError("cdxml_invalid: 不接受DTD、实体或超大文档")
+    root = ET.fromstring(cdxml)
+    if root.tag != "CDXML" or len(root.findall("page")) != 1:
+        raise ValueError("cdxml_not_editable: 需要原生单反应CDXML")
+    allowed = {"CDXML", "fonttable", "font", "colortable", "color", "page", "fragment", "n", "b", "t", "s", "arrow", "scheme", "step"}
+    if any(element.tag not in allowed for element in root.iter()):
+        raise ValueError("cdxml_not_editable: 不接受嵌入图片、对象或未知节点")
+    page = root.find("page")
+    fragments = page.findall("fragment")
+    steps = page.findall("scheme/step")
+    if len(fragments) != len(expected) or not root.findall(".//n") or len(steps) != 1 or len(page.findall("arrow")) != 1:
+        raise ValueError("cdxml_not_editable: 缺少原生分子图或唯一反应步骤")
+    ids = [node.get("id") for node in root.iter() if node.get("id") is not None and node.tag not in ("font", "color")]
+    if len(ids) != len(set(ids)):
+        raise ValueError("cdxml_invalid: 节点ID重复")
+    for fragment_element in fragments:
+        coordinates = {node.get("id"): list(map(float, node.get("p", "").split())) for node in fragment_element.findall("n")}
+        if any(len(point) != 2 or not all(math.isfinite(v) for v in point) for point in coordinates.values()):
+            raise ValueError("cdxml_geometry_invalid: 原子坐标无效")
+        for bond in fragment_element.findall("b"):
+            begin, end = coordinates.get(bond.get("B")), coordinates.get(bond.get("E"))
+            if begin is None or end is None or math.dist(begin, end) < 0.01:
+                raise ValueError("cdxml_geometry_invalid: 键引用错误或原子坐标重叠")
+    scheme = steps[0]
+    for field, smiles in (("ReactionStepReactants", request["reactants"]), ("ReactionStepProducts", request["products"])):
+        references = scheme.get(field, "").split()
+        selected = [fragment for reference in references for fragment in fragments if fragment.get("id") == reference]
+        if len(selected) != len(smiles) or len(set(references)) != len(references):
+            raise ValueError("cdxml_reaction_mismatch: 反应物或产物链接缺失")
+        subset = ET.Element("CDXML", root.attrib)
+        subset_page = ET.SubElement(subset, "page", page.attrib)
+        for fragment_element in selected:
+            subset_page.append(copy.deepcopy(fragment_element))
+        actual = Chem.MolsFromCDXML(ET.tostring(subset, encoding="unicode"))
+        if Counter(map(identity, actual)) != Counter(identity(molecule(s)) for s in smiles):
+            raise ValueError("cdxml_graph_mismatch: 原子、键、反应方向或立体化学与本步结构不一致")
+    if set(scheme.get("ReactionStepReactants", "").split() + scheme.get("ReactionStepProducts", "").split()) != {f.get("id") for f in fragments}:
+        raise ValueError("cdxml_reaction_mismatch: 存在未关联或复用的分子图")
+    arrow_ids = scheme.get("ReactionStepArrows", "").split()
+    if arrow_ids != [page.find("arrow").get("id")]:
+        raise ValueError("cdxml_reaction_mismatch: 反应箭头未关联")
+    _, above, below, _, _, _ = reaction_layout(request)
+    for field, lines in (("ReactionStepObjectsAboveArrow", above), ("ReactionStepObjectsBelowArrow", below)):
+        values = []
+        for reference in scheme.get(field, "").split():
+            matches = [t for t in page.findall("t") if t.get("id") == reference]
+            if len(matches) != 1:
+                raise ValueError("cdxml_conditions_mismatch")
+            values.append("".join(run.text or "" for run in matches[0].findall("s")))
+        if values != lines:
+            raise ValueError("cdxml_conditions_mismatch: 条件文字与本步记录不一致")
+    bounds = cdxml_drawing_bounds(root)
+    canvas = list(map(float, page.get("BoundingBox", "").split()))
+    if len(canvas) != 4 or not all(math.isfinite(v) for v in bounds + canvas) or bounds[0] < canvas[0] or bounds[1] < canvas[1] or bounds[2] > canvas[2] or bounds[3] > canvas[3]:
+        raise ValueError("cdxml_canvas_overflow")
+    data = base64.b64decode(request["png"], validate=True)
+    if len(data) > 10_000_000:
+        raise ValueError("reaction_image_too_large")
+    expected_png, image_layout = reaction_png(request, expected[:len(request["reactants"])], expected[len(request["reactants"]):])
+    with Image.open(io.BytesIO(data)) as actual_image, Image.open(io.BytesIO(expected_png)) as reference_image:
+        if actual_image.format != "PNG" or actual_image.size != reference_image.size or actual_image.convert("RGB").tobytes() != reference_image.tobytes():
+            raise ValueError("reaction_image_mismatch: 图库必须使用本步本地生成并紧裁剪的反应PNG，不能用PDF整页或替换图片")
+    return {"editableGraph": "passed", "stereoRoundtrip": "passed", "reactionImage": image_layout,
+            "pngSha256": hashlib.sha256(data).hexdigest(), "cdxmlSha256": hashlib.sha256(cdxml.encode()).hexdigest(),
+            "sourceImageFidelity": "not-machine-verified"}
 
 
 def heading_crop(document, number, heading_text):
@@ -411,6 +529,17 @@ def execute(request):
         return edit(request)
     if operation == "render_step":
         return render_step(request)
+    if operation == "verify_delivery":
+        steps = request["steps"]
+        if not isinstance(steps, list) or not 1 <= len(steps) <= 60:
+            raise ValueError("delivery_steps_invalid")
+        results = []
+        for step_request in steps:
+            try:
+                results.append({"order": step_request["order"], "ok": True, "verification": verify_step_artifacts(step_request)})
+            except Exception as error:
+                results.append({"order": step_request["order"], "ok": False, "error": str(error)[:1000]})
+        return {"results": results}
     if operation in ("pdf_index", "pdf_page", "pdf_heading_bbox"):
         return pdf_operation(request)
     if operation == "image_crop":

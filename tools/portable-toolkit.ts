@@ -7,6 +7,7 @@ import { AgentRunner, ProtocolItem, SessionState } from "../src/runner";
 import { indexSource } from "../src/sources";
 import { TOOLS, validateToolCall } from "../src/tools";
 import { LocalStore } from "./local-store";
+import { auditDelivery } from "../src/delivery";
 
 function object(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("request_invalid: 需要 JSON 对象");
@@ -98,6 +99,14 @@ export class LocalToolkit {
           const archived = existing.sources.find(item => item.id === source.id);
           if (!archived || archived.name !== source.name || archived.path !== source.path || !Buffer.from(await store.readBinary(source.path)).equals(Buffer.from(source.bytes))) throw new Error("route_exists: 来源与已有路线不同，保留原记录");
         }
+        if (existing.status === "completed") {
+          const delivery = await auditDelivery(existing, store, this.chemistry);
+          if (!delivery.complete) {
+            existing.status = "deliveryIncomplete";
+            await this.runner(existing, store).event("delivery_reopened", { delivery });
+          }
+          return { ...this.summary(existing, vault), delivery, reused: true };
+        }
         return { ...this.summary(existing, vault), reused: true };
       }
       const sources: SourceAsset[] = [];
@@ -120,7 +129,15 @@ export class LocalToolkit {
   }
   async status(value: unknown): Promise<ProtocolItem> {
     const { vault, routeId, dir } = location(value);
-    return this.locked(vault, dir, async store => this.summary(await this.load(store, routeId, dir), vault));
+    return this.locked(vault, dir, async store => {
+      const state = await this.load(store, routeId, dir);
+      const delivery = await auditDelivery(state, store, this.chemistry);
+      if (state.status === "completed" && !delivery.complete) {
+        state.status = "deliveryIncomplete";
+        await this.runner(state, store).event("delivery_reopened", { delivery });
+      }
+      return { ...this.summary(state, vault), delivery };
+    });
   }
   async call(value: unknown): Promise<ProtocolItem> {
     const request = object(value), { vault, routeId, dir } = location(request);
@@ -134,9 +151,12 @@ export class LocalToolkit {
       if (previous?.phase === "completed") {
         if (typeof previous.output.output !== "string") throw new Error("receipt_invalid: 本地回执格式不正确");
         const result: unknown = JSON.parse(previous.output.output);
+        try { await runner.validateCachedDelivery(tool, args); }
+        catch (error) { await runner.event("cached_delivery_rejected", { tool, callId }); throw error; }
+        if (tool === "validate_route") return { callId, tool, reused: false, result: await runner.execute(tool, args), status: state.status };
         return { callId, tool, reused: true, result, status: state.status };
       }
-      if (state.status === "completed") throw new Error("route_completed: 已完成的路线需要由用户修改记录或新建路线");
+      if (state.status === "completed" && !["validate_route", "read_source_page", "search_sources", "inspect_structure", "locate_reaction", "finish_route", "render_step", "write_step"].includes(tool)) throw new Error("route_completed: 已完成的路线需要由用户修改记录或新建路线");
       state.executions ??= {};
       if (!previous) state.calls++;
       state.executions[callId] = { name: tool, arguments: argumentsText, phase: "started" };
@@ -144,6 +164,7 @@ export class LocalToolkit {
       let result: ProtocolItem;
       try { result = await runner.execute(tool, args); }
       catch (error: unknown) { await runner.event("local_tool_failed", { tool, callId, message: error instanceof Error ? error.message : String(error) }); throw error; }
+      if (tool === "validate_route" && state.status === "completed" && result.complete === false) state.status = "deliveryIncomplete";
       if (tool === "read_source_page" && typeof result.image === "string") {
         const path = `${dir}/assets/read-page-${createHash("sha256").update(argumentsText).digest("hex").slice(0, 14)}.png`;
         const bytes = Buffer.from(result.image, "base64");

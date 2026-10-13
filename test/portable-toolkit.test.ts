@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { fixtureDeliveryVerification } from "./delivery-fixture";
 import test from "node:test";
 import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -8,7 +9,7 @@ import { ExperimentStep } from "../src/domain";
 import { LocalToolkit } from "../tools/portable-toolkit";
 
 const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64");
-const noChemistry: Chemistry = { call: async () => { throw new Error("unexpected chemistry"); } };
+const noChemistry: Chemistry = { call: async <T>(request: Record<string, unknown>) => fixtureDeliveryVerification(request) as T };
 async function fixture(t: { after: (fn: () => Promise<void>) => void }) {
   const prefix = join(tmpdir(), "organic-lab-test-");
   const root = await mkdtemp(prefix), source = join(root, "source.png"), vault = join(root, "vault");
@@ -78,7 +79,10 @@ test("portable page reads return a real local image for host visual inspection",
 });
 test("portable toolkit creates the complete record set without any model API", async t => {
   const f = await fixture(t);
-  const chemistry: Chemistry = { call: async <T>(request: Record<string, unknown>) => { assert.equal(request.op, "render_step"); return { png: png.toString("base64"), cdxml: "fixture CDXML", quality: {}, properties: [] } as T; } };
+  const chemistry: Chemistry = { call: async <T>(request: Record<string, unknown>) => {
+    if (request.op === "verify_delivery") return fixtureDeliveryVerification(request) as T;
+    assert.equal(request.op, "render_step"); return { png: png.toString("base64"), cdxml: "fixture CDXML", quality: {}, properties: [] } as T;
+  } };
   const toolkit = new LocalToolkit(chemistry);
   const calls = [{ tool: "record_route", args: { plan: { title: "fixture route", intent: "offline reusable tool validation", requestedChanges: [], steps: [step()] } } }, { tool: "render_step", args: { step: 1 } }, { tool: "write_step", args: { step: 1 } }, { tool: "finish_route", args: {} }];
   for (const [index, call] of calls.entries()) {
@@ -100,4 +104,15 @@ test("portable toolkit creates the complete record set without any model API", a
   assert.ok((await readFile(join(f.dir, "route-1-01-R01-fixture step.md"), "utf8")).includes("实际操作与现象记录"));
   assert.ok((await readFile(join(f.dir, "路线.base"), "utf8")).includes("imageFit: contain"));
   assert.equal((await toolkit.call({ ...f.request, ...calls[3], callId: "tool-3" })).reused, true);
+  const completedState = JSON.parse(await readFile(join(f.dir, "会话状态.json"), "utf8"));
+  await rm(join(f.vault, completedState.rendered[1].cdxml));
+  await assert.rejects(toolkit.call({ ...f.request, ...calls[3], callId: "tool-3" }), /artifact_missing/);
+  const reopened = await toolkit.status(f.request);
+  assert.equal(reopened.status, "deliveryIncomplete");
+  assert.equal((reopened.delivery as { complete: boolean }).complete, false);
+  const freshReport = await toolkit.call({ ...f.request, tool: "validate_route", args: {}, callId: "audit-1" });
+  assert.equal((freshReport.result as { complete: boolean }).complete, false);
+  await writeFile(join(f.vault, completedState.rendered[1].cdxml), "fixture CDXML");
+  const repeatReport = await toolkit.call({ ...f.request, tool: "validate_route", args: {}, callId: "audit-1" });
+  assert.equal((repeatReport.result as { complete: boolean }).complete, true, "read-only audits must refresh even with the same call ID");
 });

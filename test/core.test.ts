@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { fixtureDeliveryVerification } from "./delivery-fixture";
 import { test } from "node:test";
 import { parse } from "yaml";
 import { ExperimentStep, FileStore, Reagent, safePath, SourceAsset } from "../src/domain";
@@ -67,7 +68,7 @@ test("gallery edits preserve filters, unrelated views, user ordering and comment
 });
 test("legacy editor is moved ahead of the saved calculation without losing handwritten material", () => {
   const s = step();
-  const note = buildStepNote("r", s, { image: "a.png", cdxml: null, svg: null, quality: "q.json" }, [source], null, null);
+  const note = buildStepNote("r", s, { image: "a.png", cdxml: "a.cdxml", svg: null, quality: "q.json" }, [source], null, null);
   const editor = note.match(/## 计量输入\n\n```organic-stoich[\s\S]*?```\n\n/)![0];
   let legacy = note.replace(editor, "").replace("## 文献参考步骤", `${editor.replace("## 计量输入\n\n", "")}## 文献参考步骤`);
   legacy += "\n实测：黄色油，附件 ![[本次-NMR.png]]\n";
@@ -127,7 +128,7 @@ test("source evidence rejects invented eq/page/quote, reports original quantity 
 test("paths cannot escape the vault and YAML-like text cannot inject properties", () => {
   assert.throws(() => safePath("../outside.md")); assert.throws(() => safePath("E:/outside.md"));
   const s = step(); s.referenceYield = "95%\nworked: true";
-  const fm = parseFrontmatter(buildStepNote("r", s, { image: "a.png", cdxml: null, svg: null, quality: "q.json" }, [source], null, null));
+  const fm = parseFrontmatter(buildStepNote("r", s, { image: "a.png", cdxml: "a.cdxml", svg: null, quality: "q.json" }, [source], null, null));
   assert.equal(fm.worked, null);
 });
 test("Responses request carries native tools, selected model, original image and full instruction", async () => {
@@ -176,7 +177,7 @@ test("native tool receipts feed next turn; question resumes without repeating su
   assert.equal(state.events.filter(e => e.kind === "tool_completed").length, 1);
 });
 test("invalid evidence cannot create a note; duplicate call does not create another record", async () => {
-  const state = initial(); const store = new MemoryStore(); const chemistry: Chemistry = { call: async <T>(req: Record<string, unknown>) => (req.op === "inspect" ? { mw: 102.09 } : { png: Buffer.from("test bytes").toString("base64"), cdxml: "transport fixture", properties: [], quality: {} }) as T };
+  const state = initial(); const store = new MemoryStore(); const chemistry: Chemistry = { call: async <T>(req: Record<string, unknown>) => (req.op === "verify_delivery" ? fixtureDeliveryVerification(req) : req.op === "inspect" ? { mw: 102.09 } : { png: Buffer.from("test bytes").toString("base64"), cdxml: "transport fixture", properties: [], quality: {} }) as T };
   const runner = new AgentRunner(state, store, chemistry, { turn: async () => { throw new Error("not used"); } }, () => undefined);
   const s = step(); await runner.execute("record_route", { plan: { title: "route", intent: "task", requestedChanges: [], steps: [s] } });
   await runner.execute("render_step", { step: 1 }); s.reagents[0].equivalents = 3;

@@ -86,7 +86,10 @@ sh '/path/to/organic-lab-records/scripts/run-lab.sh' init --request '/path/to/in
 | `lookup_reagent` | 补可核对的物料性质 |
 | `edit_structure` | 执行明确的局部结构编辑 |
 | `set_scale` | 绑定当前步底物与 mmol |
-| `render_step` | 保存反应 PNG/CDXML 或来源图裁剪 |
+| `locate_reaction` | 按实验标题定位反应局部区域，供读取查看 |
+| `set_step_structures` | 补齐尚未写入的一步结构，不重做其他步骤 |
+| `validate_route` | 重读实际文件，报告必需交付物与逐步缺项 |
+| `render_step` | 生成紧裁剪单反应 PNG 与必需的原生 CDXML |
 | `write_step` | 保存单步 Markdown 和计量表 |
 | `finish_route` | 校验步骤并保存路线主页与图库 |
 

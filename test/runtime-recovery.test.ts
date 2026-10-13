@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { fixtureDeliveryVerification } from "./delivery-fixture";
 import { test } from "node:test";
 import { ExperimentStep, FileStore, Reagent, RoutePlan } from "../src/domain";
 import { AgentRunner, ProtocolItem, SessionState, Transport } from "../src/runner";
@@ -71,8 +72,9 @@ function assertAllCallsPaired(state: SessionState): void {
   }
 }
 const noModelRequests: Transport = { turn: async () => { throw new Error("unexpected model request during recovery"); } };
-const noChemistry = { call: async <T>(): Promise<T> => { throw new Error("unexpected chemistry execution"); } };
+const noChemistry = { call: async <T>(request: Record<string, unknown>): Promise<T> => fixtureDeliveryVerification(request) as T };
 const renderingChemistry = { call: async <T>(request: Record<string, unknown>): Promise<T> => {
+  if (request.op === "verify_delivery") return fixtureDeliveryVerification(request) as T;
   assert.equal(request.op, "render_step");
   return { png: Buffer.from("fixture png").toString("base64"), cdxml: "fixture cdxml", properties: [], quality: { fixture: true } } as T;
 } };

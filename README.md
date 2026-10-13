@@ -4,7 +4,7 @@
 
 An agent skill and local toolkit for evidence-linked organic synthesis records. The host model reads the sources; local tools calculate, validate and write artifacts.
 
-**当前版本：0.1.1 测试版。** 结构识别依赖宿主模型，复杂立体结构和完整文献的跨模型准确率尚未完成基准测试。已确认结构由本地工具导出和读回校验；不能确认的结构保留原图及待核对项。
+**当前版本：0.1.2 测试版。** 结构识别依赖宿主模型，复杂立体结构和完整文献的跨模型准确率尚未完成基准测试。每一步必须通过紧裁剪反应 PNG、原生可编辑 CDXML 和笔记链接验收；缺少结构时保留进度并继续修复，不能标为完成。来源图识别准确率仍需独立评测。
 
 ## 三步开始
 
@@ -20,7 +20,7 @@ Codex 用户双击 `setup-codex.cmd`，通过 `$organic-lab-records` 加链接�
 
 - 获取可访问的正文及 SI，保留来源、页码和原文依据。
 - 按文献原投料整理完整主路线，每篇文献建立独立目录；指定全部目标或分支时覆盖指定范围。
-- 生成路线主页、逐步 Markdown、计量表、反应 PNG 和已确认结构的 CDXML。
+- 生成路线主页、逐步 Markdown、计量表、单反应 PNG 和每一步必需的可编辑 CDXML。
 - 先处理结构并复用已核对中间体，保留 one-pot、粗品续用、合并产率和原文冲突。
 - 实际规模、操作、现象及实测结果留空，供使用者记录。
 

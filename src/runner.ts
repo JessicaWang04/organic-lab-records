@@ -1,12 +1,13 @@
 import { createHash } from "node:crypto";
 import { Chemistry } from "./chemistry";
 import { Citation, ExperimentStep, FileStore, finitePositive, RoutePlan, SourceAsset, StepArtifacts, validatePlan } from "./domain";
-import { buildBase, buildStepNote, GalleryOptions, pad, parseFrontmatter, routeNote, stepFile } from "./records";
+import { buildBase, buildStepNote, GalleryOptions, pad, routeNote, stepFile } from "./records";
 import { checkEvidence, requiresStructureEdit } from "./quality";
 import { searchSources, sourcePage } from "./sources";
 import { validateToolCall } from "./tools";
 import { PropertyResolver } from "./reagent-properties";
 import { BudgetLimits, DEFAULT_BUDGET, validateBudget } from "./budget";
+import { auditDelivery, assertDelivery, requireStructures } from "./delivery";
 export type ProtocolItem = Record<string, unknown>;
 export interface Turn { output: ProtocolItem[]; usage?: unknown }
 export interface Transport { turn(input: ProtocolItem[]): Promise<Turn> }
@@ -48,7 +49,7 @@ export class AgentRunner {
   }
   async save(): Promise<void> {
     await this.store.write(`${this.state.dir}/会话状态.json`, JSON.stringify(this.state, null, 2), true);
-    await this.store.write(`${this.state.dir}/运行日志.json`, JSON.stringify({ harness: "organic-lab/0.1.0", events: this.state.events }, null, 2), true);
+    await this.store.write(`${this.state.dir}/运行日志.json`, JSON.stringify({ harness: "organic-lab/0.1.2", events: this.state.events }, null, 2), true);
   }
   async event(kind: string, details: ProtocolItem = {}): Promise<void> {
     this.state.events.push({ time: new Date().toISOString(), kind, ...details });
@@ -93,6 +94,28 @@ export class AgentRunner {
       return { stepCount: plan.steps.length, steps: plan.steps.map(s => ({ order: s.order, title: s.title, review: checkEvidence(s, this.state.sources) })) };
     }
     if (name === "inspect_structure") return this.chemistry.call({ op: "inspect", smiles: args.smiles });
+    if (name === "locate_reaction") {
+      const source = this.source(String(args.sourceId));
+      if (source.mime !== "application/pdf") throw new Error("pdf_required: 截图可直接用read_source_page的bbox裁剪");
+      const data = Buffer.from(await this.store.readBinary(source.path)).toString("base64");
+      return this.chemistry.call({ op: "pdf_heading_bbox", data, page: args.page, heading: args.heading });
+    }
+    if (name === "set_step_structures") {
+      const step = this.step(Number(args.step));
+      if (this.state.written[step.order]) throw new Error("records_exist: 已写记录保留原件；结构变更请建立新路线");
+      const reactants = args.reactants as string[], products = args.products as string[];
+      requireStructures({ ...step, reactants, products });
+      if (reactants.length + products.length > 12) throw new Error("structure_limit: 单步最多12个结构");
+      const inspected = await Promise.all([...reactants, ...products].map(smiles => this.chemistry.call({ op: "inspect", smiles })));
+      step.reactants = reactants; step.products = products;
+      delete this.state.rendered[step.order];
+      return { step: step.order, structures: inspected, next: "render_step" };
+    }
+    if (name === "validate_route") {
+      const report = await auditDelivery(this.state, this.store, this.chemistry);
+      if (!report.complete && this.state.status === "completed") this.state.status = "deliveryIncomplete";
+      return { ...report };
+    }
     if (name === "lookup_reagent") {
       const step = this.step(Number(args.step));
       if (this.state.written[step.order]) throw new Error("record_already_written: 已保存的物料性质请在笔记计量表中补全");
@@ -138,32 +161,29 @@ export class AgentRunner {
     }
     if (name === "render_step") {
       const step = this.step(Number(args.step));
-      if (this.state.written[step.order]) return { artifacts: this.state.rendered[step.order], reused: true };
-      const propertyResult = await this.properties.prefill(step.reagents, this.state.sources, true);
-      const key = digest(step); const prefix = `${this.state.dir}/assets/S${pad(step.order)}-${key}`;
-      if (this.state.rendered[step.order]) return { artifacts: this.state.rendered[step.order], reused: true };
-      let quality = checkEvidence(step, this.state.sources);
-      let artifacts: StepArtifacts;
-      if (step.reactants.length && step.products.length) {
-        const result = await this.chemistry.call<{ png: string; cdxml: string; properties: { smiles: string; mw: number }[]; quality: unknown }>({ op: "render_step", ...step });
-        quality = checkEvidence(step, this.state.sources);
-        await this.writeBinaryArtifact(`${prefix}.png`, Buffer.from(result.png, "base64"));
-        await this.writeArtifact(`${prefix}.cdxml`, result.cdxml);
-        artifacts = { image: `${prefix}.png`, cdxml: `${prefix}.cdxml`, svg: null, quality: `${prefix}-quality.json` };
-        await this.writeQualityArtifact(artifacts.quality, { chemistry: result.quality, issues: quality, properties: { reviews: propertyResult.reviews }, step: step.order });
-      } else {
-        if (!step.sourceImage) throw new Error("source_image_required: 未知结构需要原图区域，不能绘制虚构结构");
-        const image = await sourcePage(this.store, this.chemistry, this.source(step.sourceImage.sourceId), step.sourceImage.page, step.sourceImage.bbox);
-        await this.writeBinaryArtifact(`${prefix}-source.png`, Buffer.from(image.png, "base64"));
-        artifacts = { image: `${prefix}-source.png`, cdxml: null, svg: null, quality: `${prefix}-quality.json` };
-        await this.writeQualityArtifact(artifacts.quality, { chemistry: "source-image-only", issues: quality, properties: { reviews: propertyResult.reviews }, missing: ["editable structure", "stereo validation"], step: step.order });
+      requireStructures(step);
+      if (this.state.rendered[step.order]) {
+        assertDelivery(await auditDelivery(this.state, this.store, this.chemistry, [step], false));
+        return { artifacts: this.state.rendered[step.order], reused: true };
       }
+      const propertyResult = await this.properties.prefill(step.reagents, this.state.sources, true);
+      const key = digest({ renderer: "0.1.2", step }); const prefix = `${this.state.dir}/assets/S${pad(step.order)}-${key}`;
+      const result = await this.chemistry.call<{ png: string; cdxml: string; properties: { smiles: string; mw: number }[]; quality: unknown }>({ op: "render_step", ...step });
+      const quality = checkEvidence(step, this.state.sources);
+      await this.writeBinaryArtifact(`${prefix}.png`, Buffer.from(result.png, "base64"));
+      await this.writeArtifact(`${prefix}.cdxml`, result.cdxml);
+      const artifacts: StepArtifacts = { image: `${prefix}.png`, cdxml: `${prefix}.cdxml`, svg: null, quality: `${prefix}-quality.json` };
+      await this.writeQualityArtifact(artifacts.quality, { chemistry: result.quality, issues: quality, properties: { reviews: propertyResult.reviews }, step: step.order });
       this.state.rendered[step.order] = artifacts;
       return { artifacts, issues: quality, scaleMmol: step.scaleMmol, propertyUpdates: propertyResult.filled, rows: step.reagents.map(r => ({ id: r.id, mw: r.mw })) };
     }
     if (name === "write_step") {
       const step = this.step(Number(args.step));
-      if (this.state.written[step.order]) return { path: this.state.written[step.order], reused: true };
+      assertDelivery(await auditDelivery(this.state, this.store, this.chemistry, [step], false));
+      if (this.state.written[step.order]) {
+        assertDelivery(await auditDelivery(this.state, this.store, this.chemistry, [step]));
+        return { path: this.state.written[step.order], reused: true };
+      }
       const artifacts = this.state.rendered[step.order];
       if (!artifacts) throw new Error("render_first: 请先render_step");
       const errors = checkEvidence(step, this.state.sources).filter(i => i.severity === "error");
@@ -183,21 +203,25 @@ export class AgentRunner {
       const plan = this.state.plan;
       if (!plan || plan.steps.some(s => !this.state.written[s.order])) throw new Error("missing_step_records: 需要完成所有步骤记录");
       if (requiresStructureEdit(plan.requestedChanges) && !plan.steps.some(s => s.edits?.length)) throw new Error("requested_edit_not_executed: 有结构修改意图但没有本地编辑回执");
-      for (const step of plan.steps) {
-        const artifacts = this.state.rendered[step.order];
-        for (const path of [this.state.written[step.order], artifacts.image, artifacts.quality, artifacts.cdxml, ...(artifacts.referenceSpectra ?? [])].filter(Boolean) as string[]) {
-          if (!await this.store.exists(path)) throw new Error(`artifact_missing: ${path}`);
-        }
-        const note = await this.store.read(this.state.written[step.order]);
-        const properties = parseFrontmatter(note);
-        if (properties.image !== `[[${artifacts.image}]]` || !note.includes(`![[${artifacts.image}]]`) || properties.step_number !== step.order || properties.route_id !== this.state.id) throw new Error("record_artifact_mismatch: YAML、正文图片、步骤或路线引用不一致");
-      }
+      const delivery = await auditDelivery(this.state, this.store, this.chemistry);
+      if (!delivery.complete && this.state.status === "completed") this.state.status = "deliveryIncomplete";
+      assertDelivery(delivery);
       if (!await this.store.exists(`${this.state.dir}/路线.base`)) await this.store.write(`${this.state.dir}/路线.base`, buildBase(this.state.id, this.state.gallery));
       if (!await this.store.exists(`${this.state.dir}/路线.md`)) await this.store.write(`${this.state.dir}/路线.md`, routeNote(this.state.id, this.state.dir, plan));
       this.state.status = "completed";
-      return { route: `${this.state.dir}/路线.md`, gallery: `${this.state.dir}/路线.base`, stepFiles: this.state.written, status: "drafts_created" };
+      return { route: `${this.state.dir}/路线.md`, gallery: `${this.state.dir}/路线.base`, stepFiles: this.state.written, status: "drafts_created", delivery };
     }
     throw new Error(`unknown_tool: ${name}`);
+  }
+  async validateCachedDelivery(name: string, args: Record<string, unknown>): Promise<void> {
+    if (!["render_step", "write_step", "finish_route"].includes(name)) return;
+    const steps = name === "finish_route" ? this.state.plan?.steps : [this.step(Number(args.step))];
+    const report = await auditDelivery(this.state, this.store, this.chemistry, steps, name !== "render_step");
+    if (!report.complete && this.state.status === "completed") this.state.status = "deliveryIncomplete";
+    assertDelivery(report);
+    if (name === "finish_route" && this.state.plan && requiresStructureEdit(this.state.plan.requestedChanges) && !this.state.plan.steps.some(s => s.edits?.length)) {
+      throw new Error("requested_edit_not_executed: 没有本地结构编辑回执");
+    }
   }
   private pendingCalls(): ProtocolItem[] {
     const answered = new Set(this.state.context.filter(item => item.type === "function_call_output").map(item => item.call_id));
@@ -242,7 +266,12 @@ export class AgentRunner {
     if (execution?.phase === "completed" && !execution.output) throw new Error("tool_recovery_failed: 已完成的工具调用缺少保存的输出，需要核对会话");
     const recovered = execution?.output ?? await this.legacyOutput(call);
     if (recovered) {
-      this.completeCall(call, recovered);
+      let output = recovered;
+      if (["render_step", "write_step", "finish_route"].includes(name)) {
+        try { await this.validateCachedDelivery(name, JSON.parse(argumentsText)); }
+        catch (error) { output = this.toolOutput(callId, { status: "error", message: error instanceof Error ? error.message : String(error) }); }
+      }
+      this.completeCall(call, output);
       await this.event("tool_recovered", { tool: name, callId });
       return false;
     }
@@ -293,6 +322,13 @@ export class AgentRunner {
     this.running = true;
     this.stopped = false;
     try {
+      if (this.state.status === "completed") {
+        const delivery = await auditDelivery(this.state, this.store, this.chemistry);
+        if (!delivery.complete) {
+          this.state.status = "deliveryIncomplete";
+          await this.event("delivery_reopened", { delivery });
+        }
+      }
       if (this.state.question) {
         if (!answer?.trim()) throw new Error("请回答当前问题");
         const question = this.state.question;

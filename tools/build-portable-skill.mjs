@@ -41,7 +41,7 @@ if (process.argv.includes('--windows-runtime')) {
   await copyFile(join(dirname(process.execPath), 'LICENSE'), join(runtime, 'NODE-LICENSE.txt'));
 }
 const main = await readFile(join(skill, 'scripts/organic-lab.cjs')), worker = await readFile(join(skill, 'scripts/chemistry_worker.py'));
-await writeFile(join(skill, 'bundle.json'), JSON.stringify({ version: '0.1.1', modelApiRequired: false, nodeVersion: process.version,
+await writeFile(join(skill, 'bundle.json'), JSON.stringify({ version: '0.1.2', modelApiRequired: false, nodeVersion: process.version,
   chemistryWorkerSha256: createHash('sha256').update(worker).digest('hex'), cliSha256: createHash('sha256').update(main).digest('hex'),
   pythonDependencies: ['rdkit', 'Pillow', 'PyMuPDF'], commands: ['doctor','prepare-vault','init','call','status'], obsidianPlugin: { id: 'organic-lab-agent', assets: 'assets/obsidian-plugin', sha256: pluginArtifacts } }, null, 2) + '\n');
 console.log(`Portable skill built: ${skill}`);

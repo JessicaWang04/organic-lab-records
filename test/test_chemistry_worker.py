@@ -1,5 +1,6 @@
 import base64
 import importlib.util
+import io
 import sys
 import unittest
 import xml.etree.ElementTree as ET
@@ -12,6 +13,59 @@ spec.loader.exec_module(worker)
 
 
 class ChemistryTests(unittest.TestCase):
+    def delivery_request(self):
+        request = {"reactants": ["N[C@@H](C)C(=O)O"], "products": ["N[C@@H](C)C(=O)OC"], "aboveArrow": ["MeOH"], "belowArrow": ["rt"]}
+        return {**request, **worker.render_step(request)}
+
+    def test_delivery_accepts_editable_graph_and_tightly_cropped_reaction(self):
+        request = self.delivery_request()
+        result = worker.verify_step_artifacts(request)
+        self.assertEqual(result["editableGraph"], "passed")
+        with worker.Image.open(io.BytesIO(base64.b64decode(request["png"]))) as image:
+            bounds = worker.ImageChops.difference(image, worker.Image.new("RGB", image.size, "white")).getbbox()
+            self.assertEqual(bounds, (20, 20, image.width - 20, image.height - 20))
+        self.assertEqual(result["sourceImageFidelity"], "not-machine-verified")
+
+    def test_delivery_rejects_empty_bitmap_and_corrupt_cdxml(self):
+        for cdxml in ("", "not XML", '<CDXML><page><embeddedobject/></page></CDXML>', '<CDXML><page/></CDXML>'):
+            with self.subTest(cdxml=cdxml), self.assertRaises(Exception):
+                worker.verify_step_artifacts({**self.delivery_request(), "cdxml": cdxml})
+
+    def test_delivery_rejects_wrong_graph_stereo_direction_and_conditions(self):
+        request = self.delivery_request()
+        for change in ({"products": ["N[C@H](C)C(=O)OC"]}, {"products": ["CCO"]},
+                       {"reactants": request["products"], "products": request["reactants"]}, {"aboveArrow": ["different"]}):
+            with self.subTest(change=change), self.assertRaisesRegex(ValueError, "cdxml_.*mismatch"):
+                worker.verify_step_artifacts({**request, **change})
+
+    def test_delivery_rejects_full_pdf_page_even_with_forged_passed_flags(self):
+        import pymupdf
+        request = self.delivery_request()
+        with pymupdf.open() as document:
+            page = document.new_page()
+            page.insert_text((40, 40), "Reaction and experimental text")
+            data = base64.b64encode(document.tobytes()).decode()
+            full_page = worker.execute({"op": "pdf_page", "data": data, "page": 1})["png"]
+        with self.assertRaisesRegex(ValueError, "reaction_image_mismatch"):
+            worker.verify_step_artifacts({**request, "png": full_page, "quality": {"graphRoundtrip": "passed", "imageFidelity": "passed"}})
+        damaged = bytearray(base64.b64decode(request["png"]))
+        damaged[:4] = b"FAKE"
+        with self.assertRaises(Exception):
+            worker.verify_step_artifacts({**request, "png": base64.b64encode(damaged).decode()})
+
+    def test_delivery_empty_structures_and_batch_failures_are_explicit(self):
+        with self.assertRaisesRegex(ValueError, "structure_missing"):
+            worker.render_step({"reactants": [], "products": ["CCO"]})
+        request = self.delivery_request()
+        result = worker.execute({"op": "verify_delivery", "steps": [{**request, "order": 1}, {**request, "order": 2, "cdxml": ""}]})
+        self.assertEqual([item["ok"] for item in result["results"]], [True, False])
+
+    def test_long_conditions_wrap_without_clipping_the_reaction_image(self):
+        request = {"reactants": ["CCO"], "products": ["CCOC(C)=O"], "aboveArrow": ["Ac2O, DMAP, triethylamine, " * 6], "belowArrow": ["CH2Cl2, rt, 12 h"] * 7}
+        result = worker.render_step(request)
+        self.assertEqual(worker.verify_step_artifacts({**request, **result})["editableGraph"], "passed")
+        self.assertGreater(result["quality"]["reactionImage"]["height"], 250)
+
     def test_para_edit(self):
         result = worker.edit({"smiles": "Brc1ccccc1", "operation": "add_para_methoxy", "anchorElement": "Br"})
         self.assertEqual(result["after"], "COc1ccc(Br)cc1")

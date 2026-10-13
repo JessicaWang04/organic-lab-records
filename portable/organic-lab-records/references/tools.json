@@ -59,8 +59,34 @@
   },
   {
     "type": "function",
+    "name": "locate_reaction",
+    "description": "按PDF实验小节标题定位紧邻的反应式区域，支持跨页，返回真实页码和bbox。用read_source_page读取该区域并查看图像；定位失败时自行选择局部bbox。此区域仅用于来源核对，不能代替图库反应PNG或CDXML。",
+    "strict": true,
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "sourceId": {
+          "type": "string"
+        },
+        "page": {
+          "type": "integer"
+        },
+        "heading": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "sourceId",
+        "page",
+        "heading"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "type": "function",
     "name": "record_route",
-    "description": "记录原图/文献观察、用户目的和有序实验步骤。所有未知值用null/空数组。结构先记录原始观察，用户修改走edit_structure。缺少可核对SMILES可留空结构数组，并指定sourceImage。任何文献当量必须有引用；已有实验已写入后不能覆盖计划。",
+    "description": "记录原图/文献观察、用户目的和有序实验步骤。未知数值用null，未知内容用空数组。空结构仅允许暂存计划，不能render/write/finish；必须逐步补齐结构。用户修改走edit_structure。文献当量必须有引用；已写入记录不能覆盖计划。",
     "strict": true,
     "parameters": {
       "type": "object",
@@ -523,6 +549,38 @@
   },
   {
     "type": "function",
+    "name": "set_step_structures",
+    "description": "为尚未写入记录的一步补齐从来源局部图核对的反应物与产物SMILES，解析成功后更新计划并使旧绘图失效。保留其他步骤；物料表SMILES必须已与对应结构一致，物料修订可在写入前record_route。不可用占位结构绕过来源核对。",
+    "strict": true,
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "step": {
+          "type": "integer"
+        },
+        "reactants": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "products": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "step",
+        "reactants",
+        "products"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "type": "function",
     "name": "lookup_reagent",
     "description": "补全某一步物料的可核对性质：SMILES平均MW、本次PDF同编号化合物的HRMS分子式核对、常温形态、已核对常用试剂目录密度。只填空缺并附来源；不猜复杂底物密度、配方或EDCI盐型。",
     "strict": true,
@@ -631,7 +689,7 @@
   {
     "type": "function",
     "name": "render_step",
-    "description": "真实生成某步反应图片和可编辑CDXML，校验图结构与立体读回。结构未知时仅裁剪sourceImage并标待核对，CDXML为null。返回真实文件引用、MW和质量报告。",
+    "description": "生成某一步紧裁剪的单反应PNG和含原生原子/键的可编辑CDXML，校验结构和立体读回。反应物或产物结构缺失时失败，来源图片不作降级交付。缓存复用仍验证真实文件。",
     "strict": true,
     "parameters": {
       "type": "object",
@@ -666,8 +724,20 @@
   },
   {
     "type": "function",
+    "name": "validate_route",
+    "description": "重新读取实际文件，逐步验收紧裁剪反应PNG、原生可编辑CDXML、结构/立体读回及笔记链接；返回真实数量和缺项。在已完成路线也可调用；没有放宽验收的参数。",
+    "strict": true,
+    "parameters": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  {
+    "type": "function",
     "name": "finish_route",
-    "description": "检查各步骤已生成、图片与图谱链接、文件顺序和质量产物，保存路线主页、Bases图库和真实Log；全部检查成功才结束。",
+    "description": "所有步骤必须通过真实反应PNG、非空可编辑CDXML及笔记链接验收，才保存路线主页和图库并标完成。待确认结构、整页PDF、位图CDXML、伪造质量标记均不能通过。",
     "strict": true,
     "parameters": {
       "type": "object",
